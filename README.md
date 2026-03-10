@@ -53,8 +53,7 @@ Repo: `https://github.com/daniuda/explorer-webdollar`
 cd /home/node
 git clone https://github.com/daniuda/explorer-webdollar.git
 cd explorer-webdollar
-npm install
-npm run build
+# nu mai rula npm install / npm run build pe VPS
 ```
 
 ### Publicare cu Nginx (static)
@@ -96,13 +95,36 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-## 5) Update pe VPS după modificări noi
+## 5) Deploy automat din GitHub Actions (recomandat)
+
+Workflow creat in repo: `.github/workflows/deploy-vps.yml`
+
+La fiecare `git push` pe `main`, GitHub Actions va face:
+1. `npm ci`
+2. `npm run build`
+3. upload `dist` pe VPS
+4. publicare in `/var/www/explorer-webdollar`
+5. `nginx -t` si reload
+
+### Secrets necesare in GitHub
+
+In GitHub repo -> `Settings` -> `Secrets and variables` -> `Actions` -> `New repository secret`:
+
+- `VPS_HOST` = IP sau host VPS
+- `VPS_USER` = user SSH
+- `VPS_SSH_KEY` = cheia privata SSH (tot continutul)
+- `VPS_PORT` = port SSH (optional, implicit 22)
+
+Important:
+- Userul SSH trebuie sa poata rula `sudo` pentru comenzile din workflow.
+- Aceasta varianta evita build-ul pe VPS, util cand nu poti face upgrade de Node.
+
+## 6) Update manual (fallback)
 
 ```bash
-cd /home/node/explorer-webdollar
-git pull origin main
-npm install
-npm run build
-sudo cp -r dist/* /var/www/explorer-webdollar/
+cd /home/node
+# copie dist din local pe VPS (ex: scp)
+# apoi publica fiserele:
+sudo cp -r /cale/catre/dist/* /var/www/explorer-webdollar/
 sudo systemctl reload nginx
 ```
