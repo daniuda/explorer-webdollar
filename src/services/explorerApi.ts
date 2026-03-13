@@ -234,7 +234,6 @@ export async function fetchLatestBlocks(): Promise<GenericRecord[]> {
 
 export async function fetchLatestTransactions(limit = 10): Promise<GenericRecord[]> {
   const normalizedLimit = Math.max(1, limit)
-  const blocks = await getRecentBlocks(300)
   const latest: GenericRecord[] = []
 
   const collectFromBlock = (block: NormalizedBlock) => {
@@ -265,6 +264,43 @@ export async function fetchLatestTransactions(limit = 10): Promise<GenericRecord
     }
     return false
   }
+
+  // Fast path: scan recent heights in parallel (much faster than linked-hash walking).
+  try {
+    const chain = await fetchChain()
+    const tipHeight = toNumber((chain as ChainLike).height)
+    const maxHeightsToScan = 500
+    const batchSize = 25
+
+    for (let scanned = 0; scanned < maxHeightsToScan && latest.length < normalizedLimit; scanned += batchSize) {
+      const heights: number[] = []
+      for (let i = 0; i < batchSize; i += 1) {
+        const height = tipHeight - scanned - i
+        if (height < 0) break
+        heights.push(height)
+      }
+      if (heights.length === 0) break
+
+      const blocksByHeight = await Promise.all(
+        heights.map(async (height) => {
+          try {
+            return normalizeBlock(await fetchBlockRaw(String(height)))
+          } catch {
+            return null
+          }
+        }),
+      )
+
+      for (const block of blocksByHeight) {
+        if (!block) continue
+        if (collectFromBlock(block)) return latest
+      }
+    }
+  } catch {
+    // Continue with fallback strategies.
+  }
+
+  const blocks = await getRecentBlocks(300)
 
   for (const block of blocks) {
     if (collectFromBlock(block)) return latest
