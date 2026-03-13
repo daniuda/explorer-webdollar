@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { fetchTransaction, type GenericRecord } from '../services/explorerApi'
+import { fetchLatestTransactions, fetchTransaction, type GenericRecord } from '../services/explorerApi'
 
 const txId = ref('')
 const loading = ref(false)
 const error = ref('')
 const transaction = ref<GenericRecord | null>(null)
+const latestLoading = ref(false)
+const latest = ref<GenericRecord[]>([])
 const route = useRoute()
 const router = useRouter()
 const encodeParam = (value: string) => encodeURIComponent(value)
@@ -56,6 +58,15 @@ const runSearch = async (rawTxId: string, updateRoute: boolean) => {
   }
 }
 
+const loadLatest = async () => {
+  latestLoading.value = true
+  try {
+    latest.value = await fetchLatestTransactions(10)
+  } finally {
+    latestLoading.value = false
+  }
+}
+
 const searchTx = async () => {
   await runSearch(txId.value, true)
 }
@@ -67,6 +78,7 @@ const hydrateFromRoute = async () => {
 }
 
 onMounted(async () => {
+  await loadLatest()
   await hydrateFromRoute()
 })
 
@@ -83,8 +95,9 @@ watch(
     <header class="view-header">
       <div>
         <h1>Transactions</h1>
-        <p>Search transaction details by tx id.</p>
+        <p>Search by tx id and browse latest 10 transactions.</p>
       </div>
+      <button class="ghost-btn" @click="loadLatest">Reload</button>
     </header>
 
     <div class="search-row">
@@ -128,6 +141,40 @@ watch(
         <summary>Raw JSON</summary>
         <pre class="json-box">{{ JSON.stringify(transaction, null, 2) }}</pre>
       </details>
+    </section>
+
+    <section class="panel">
+      <h2>Latest 10 Transactions</h2>
+      <p v-if="latestLoading">Loading latest transactions...</p>
+      <p v-else-if="latest.length === 0">No transactions to show.</p>
+      <table v-else class="data-table">
+        <thead>
+          <tr>
+            <th>Tx</th>
+            <th>From</th>
+            <th>To</th>
+            <th>Amount</th>
+            <th>Block</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="tx in latest" :key="String(tx.txId)">
+            <td class="truncate">
+              <RouterLink :to="`/tx/${encodeParam(String(tx.txId))}`" class="explorer-link">{{ tx.txId }}</RouterLink>
+            </td>
+            <td class="truncate">
+              <RouterLink v-if="tx.fromAddress && tx.fromAddress !== '-'" :to="`/address/${encodeParam(String(tx.fromAddress))}`" class="explorer-link">{{ tx.fromAddress }}</RouterLink>
+              <span v-else>-</span>
+            </td>
+            <td class="truncate">
+              <RouterLink v-if="tx.toAddress && tx.toAddress !== '-'" :to="`/address/${encodeParam(String(tx.toAddress))}`" class="explorer-link">{{ tx.toAddress }}</RouterLink>
+              <span v-else>-</span>
+            </td>
+            <td>{{ tx.amount ?? '-' }}</td>
+            <td>{{ tx.blockHeight ?? '-' }}</td>
+          </tr>
+        </tbody>
+      </table>
     </section>
   </section>
 </template>

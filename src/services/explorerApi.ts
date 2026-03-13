@@ -223,11 +223,47 @@ export async function fetchChain(): Promise<ChainResponse> {
 }
 
 export async function fetchLatestBlocks(): Promise<GenericRecord[]> {
-  const scanned = await getRecentBlocks(12)
+  const scanned = await getRecentBlocks(10)
   if (scanned.length > 0) return scanned
 
   const data = await firstSuccessful<unknown>([async () => (await api.get('/blocks')).data])
   return parseBlocksPayload(data).map((item) => normalizeBlock(item))
+}
+
+export async function fetchLatestTransactions(limit = 10): Promise<GenericRecord[]> {
+  const normalizedLimit = Math.max(1, limit)
+  const blocks = await getRecentBlocks(250)
+  const latest: GenericRecord[] = []
+
+  for (const block of blocks) {
+    for (const tx of block.transactions) {
+      const txId = txIdFromUnknown(tx)
+      if (!txId) continue
+
+      const txData = tx && typeof tx === 'object' ? (tx as GenericRecord) : {}
+      const fromAddresses = addressFromTxSide(txData.from)
+      const toAddresses = addressFromTxSide(txData.to)
+      const amount = toNumber((Array.isArray(txData.to) && txData.to.length > 0 && typeof txData.to[0] === 'object'
+        ? (txData.to[0] as GenericRecord).amount
+        : txData.amount) ?? 0)
+
+      latest.push({
+        txId,
+        fromAddress: fromAddresses[0] ?? '-',
+        toAddress: toAddresses[0] ?? '-',
+        amount,
+        blockHeight: block.height,
+        blockHash: block.hash,
+        timestamp: block.timestamp,
+      })
+
+      if (latest.length >= normalizedLimit) {
+        return latest
+      }
+    }
+  }
+
+  return latest
 }
 
 export async function fetchBlockByParam(param: string): Promise<GenericRecord> {
