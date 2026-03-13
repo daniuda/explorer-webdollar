@@ -25,6 +25,33 @@ const selectedTxs = computed(() => {
   return Array.isArray(txs) ? txs : []
 })
 
+const selectedDataLevel1 = computed<GenericRecord>(() => {
+  const raw = selected.value
+  if (!raw || typeof raw !== 'object') return {}
+  const level1 = (raw as GenericRecord).data
+  return level1 && typeof level1 === 'object' ? (level1 as GenericRecord) : (raw as GenericRecord)
+})
+
+const selectedDataLevel2 = computed<GenericRecord>(() => {
+  const level1 = selectedDataLevel1.value
+  const level2 = level1.data
+  return level2 && typeof level2 === 'object' ? (level2 as GenericRecord) : level1
+})
+
+const selectedPowPos = computed(() => {
+  const posMinerAddress = String(selectedDataLevel1.value.posMinerAddress ?? '').trim()
+  return posMinerAddress ? 'POS' : 'POW'
+})
+
+const selectedVersion = computed(() => selectedDataLevel1.value.version ?? '-')
+const selectedHashPrev = computed(() => String(selectedDataLevel1.value.hashPrev ?? selected.value?.hashPrev ?? '').trim())
+const selectedHashChainPrev = computed(() => String(selectedDataLevel1.value.hashChainPrev ?? '-'))
+const selectedNonce = computed(() => selectedDataLevel1.value.nonce ?? '-')
+const selectedDifficulty = computed(() => selectedDataLevel1.value.difficulty ?? '-')
+const selectedHashChain = computed(() => selectedDataLevel1.value.hashChain ?? '-')
+const selectedReward = computed(() => selectedDataLevel1.value.reward ?? '-')
+const selectedResolvedBy = computed(() => selectedDataLevel1.value.resolvedBy ?? selectedDataLevel2.value.resolvedBy ?? '-')
+
 const loadLatest = async () => {
   loading.value = true
   error.value = ''
@@ -100,6 +127,7 @@ watch(
 
     <section v-if="selected" class="panel">
       <h2>Search Result</h2>
+      <p>Viewing block: {{ selected.height ?? '-' }}</p>
       <table class="data-table">
         <tbody>
           <tr>
@@ -113,11 +141,36 @@ watch(
             </td>
           </tr>
           <tr>
+            <th>POW/POS</th>
+            <td>{{ selectedPowPos }}</td>
+          </tr>
+          <tr>
+            <th>Version</th>
+            <td>{{ selectedVersion }}</td>
+          </tr>
+          <tr>
+            <th>Hash Prev</th>
+            <td class="truncate">
+              <RouterLink
+                v-if="selectedHashPrev"
+                :to="`/block/${encodeParam(selectedHashPrev)}`"
+                class="explorer-link"
+              >
+                {{ selectedHashPrev }}
+              </RouterLink>
+              <span v-else>-</span>
+            </td>
+          </tr>
+          <tr>
+            <th>Hash Chain Prev</th>
+            <td class="truncate">{{ selectedHashChainPrev }}</td>
+          </tr>
+          <tr>
             <th>Miner</th>
             <td class="truncate">
               <RouterLink
                 v-if="selected.minerAddress"
-                :to="`/address/${encodeParam(String(selected.minerAddress))}`"
+                :to="`/address/${encodeParam(formatAddressDisplay(selected.minerAddress))}`"
                 class="explorer-link"
               >
                 {{ formatAddressDisplay(selected.minerAddress) }}
@@ -126,8 +179,32 @@ watch(
             </td>
           </tr>
           <tr>
+            <th>Nonce</th>
+            <td>{{ selectedNonce }}</td>
+          </tr>
+          <tr>
             <th>Timestamp</th>
             <td>{{ selected.timestamp ?? selected.timeStamp ?? '-' }}</td>
+          </tr>
+          <tr>
+            <th>Difficulty</th>
+            <td class="truncate">{{ selectedDifficulty }}</td>
+          </tr>
+          <tr>
+            <th>Hash Chain</th>
+            <td class="truncate">{{ selectedHashChain }}</td>
+          </tr>
+          <tr>
+            <th>Reward</th>
+            <td>{{ selectedReward }}</td>
+          </tr>
+          <tr>
+            <th>Resolved By</th>
+            <td>{{ selectedResolvedBy }}</td>
+          </tr>
+          <tr>
+            <th>Transactions</th>
+            <td>{{ selectedTxs.length }}</td>
           </tr>
         </tbody>
       </table>

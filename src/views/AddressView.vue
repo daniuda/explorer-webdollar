@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fetchAddress, fetchAddressTxs, type GenericRecord } from '../services/explorerApi'
 import { formatAddressDisplay } from '../utils/addressFormat'
@@ -9,9 +9,17 @@ const loading = ref(false)
 const error = ref('')
 const addressInfo = ref<GenericRecord | null>(null)
 const transactions = ref<GenericRecord[]>([])
+const showAllTransactions = ref(false)
 const route = useRoute()
 const router = useRouter()
 const encodeParam = (value: string) => encodeURIComponent(value)
+
+const visibleTransactions = computed(() => {
+  if (showAllTransactions.value) return transactions.value
+  return transactions.value.slice(0, 3)
+})
+
+const remainingTransactions = computed(() => Math.max(0, transactions.value.length - 3))
 
 const firstAddress = (side: unknown): string => {
   if (!Array.isArray(side) || side.length === 0) return ''
@@ -48,6 +56,7 @@ const runSearch = async (rawAddress: string, updateRoute: boolean) => {
   error.value = ''
   addressInfo.value = null
   transactions.value = []
+  showAllTransactions.value = false
 
   try {
     const [info, txs] = await Promise.all([
@@ -56,8 +65,10 @@ const runSearch = async (rawAddress: string, updateRoute: boolean) => {
     ])
     addressInfo.value = info
     transactions.value = txs
+    const routeAddress = formatAddressDisplay(trimmed)
+    address.value = routeAddress
     if (updateRoute) {
-      await router.push(`/address/${encodeURIComponent(trimmed)}`)
+      await router.push(`/address/${encodeURIComponent(routeAddress)}`)
     }
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Address not found.'
@@ -133,7 +144,23 @@ watch(
     <section class="panel">
       <h2>Address Transactions</h2>
       <p v-if="transactions.length === 0">No transactions to show.</p>
-      <table v-else class="data-table">
+      <div v-else class="search-row" style="margin-top: 0; margin-bottom: 0.75rem;">
+        <button
+          v-if="!showAllTransactions && remainingTransactions > 0"
+          class="ghost-btn"
+          @click="showAllTransactions = true"
+        >
+          Mai multe tranzactii ({{ remainingTransactions }})
+        </button>
+        <button
+          v-else-if="showAllTransactions && transactions.length > 3"
+          class="ghost-btn"
+          @click="showAllTransactions = false"
+        >
+          Arata doar ultimele 3
+        </button>
+      </div>
+      <table v-if="transactions.length > 0" class="data-table">
         <thead>
           <tr>
             <th>TxId</th>
@@ -143,7 +170,7 @@ watch(
           </tr>
         </thead>
         <tbody>
-          <tr v-for="tx in transactions" :key="String(tx.txId ?? tx.hash ?? tx.id ?? `${tx.from ?? ''}-${tx.to ?? ''}-${tx.amount ?? ''}`)">
+          <tr v-for="tx in visibleTransactions" :key="String(tx.txId ?? tx.hash ?? tx.id ?? `${tx.from ?? ''}-${tx.to ?? ''}-${tx.amount ?? ''}`)">
             <td class="truncate">
               <RouterLink
                 v-if="tx.txId || tx.hash"
@@ -157,7 +184,7 @@ watch(
             <td class="truncate">
               <RouterLink
                 v-if="txFrom(tx)"
-                :to="`/address/${encodeParam(txFrom(tx))}`"
+                :to="`/address/${encodeParam(formatAddressDisplay(txFrom(tx)))}`"
                 class="explorer-link"
               >
                 {{ formatAddressDisplay(txFrom(tx)) }}
@@ -167,7 +194,7 @@ watch(
             <td class="truncate">
               <RouterLink
                 v-if="txTo(tx)"
-                :to="`/address/${encodeParam(txTo(tx))}`"
+                :to="`/address/${encodeParam(formatAddressDisplay(txTo(tx)))}`"
                 class="explorer-link"
               >
                 {{ formatAddressDisplay(txTo(tx)) }}

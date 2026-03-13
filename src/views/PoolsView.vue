@@ -102,7 +102,7 @@ onMounted(() => {
         <tbody>
           <tr v-for="miner in pool.miners" :key="`${pool.name}-${miner.address}-${miner.balance}`">
             <td class="truncate">
-              <RouterLink :to="`/address/${encodeParam(miner.address)}`" class="explorer-link">{{ formatAddressDisplay(miner.address) }}</RouterLink>
+              <RouterLink :to="`/address/${encodeParam(formatAddressDisplay(miner.address))}`" class="explorer-link">{{ formatAddressDisplay(miner.address) }}</RouterLink>
             </td>
             <td>{{ formatNumber(miner.balance, 4) }}</td>
             <td>{{ formatNumber(miner.balance * markets.webdUsdt, 2) }}</td>

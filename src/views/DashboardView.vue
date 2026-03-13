@@ -96,7 +96,7 @@ onUnmounted(() => {
             <td class="truncate">
               <RouterLink
                 v-if="block.minerAddress"
-                :to="`/address/${encodeParam(String(block.minerAddress))}`"
+                :to="`/address/${encodeParam(formatAddressDisplay(block.minerAddress))}`"
                 class="explorer-link"
               >
                 {{ formatAddressDisplay(block.minerAddress) }}

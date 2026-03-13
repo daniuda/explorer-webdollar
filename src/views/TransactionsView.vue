@@ -120,14 +120,14 @@ watch(
           <tr>
             <th>From</th>
             <td class="truncate">
-              <RouterLink v-if="fromAddress" :to="`/address/${encodeParam(fromAddress)}`" class="explorer-link">{{ formatAddressDisplay(fromAddress) }}</RouterLink>
+              <RouterLink v-if="fromAddress" :to="`/address/${encodeParam(formatAddressDisplay(fromAddress))}`" class="explorer-link">{{ formatAddressDisplay(fromAddress) }}</RouterLink>
               <span v-else>-</span>
             </td>
           </tr>
           <tr>
             <th>To</th>
             <td class="truncate">
-              <RouterLink v-if="toAddress" :to="`/address/${encodeParam(toAddress)}`" class="explorer-link">{{ formatAddressDisplay(toAddress) }}</RouterLink>
+              <RouterLink v-if="toAddress" :to="`/address/${encodeParam(formatAddressDisplay(toAddress))}`" class="explorer-link">{{ formatAddressDisplay(toAddress) }}</RouterLink>
               <span v-else>-</span>
             </td>
           </tr>
@@ -164,11 +164,11 @@ watch(
               <RouterLink :to="`/tx/${encodeParam(String(tx.txId))}`" class="explorer-link">{{ tx.txId }}</RouterLink>
             </td>
             <td class="truncate">
-              <RouterLink v-if="tx.fromAddress && tx.fromAddress !== '-'" :to="`/address/${encodeParam(String(tx.fromAddress))}`" class="explorer-link">{{ formatAddressDisplay(tx.fromAddress) }}</RouterLink>
+              <RouterLink v-if="tx.fromAddress && tx.fromAddress !== '-'" :to="`/address/${encodeParam(formatAddressDisplay(tx.fromAddress))}`" class="explorer-link">{{ formatAddressDisplay(tx.fromAddress) }}</RouterLink>
               <span v-else>-</span>
             </td>
             <td class="truncate">
-              <RouterLink v-if="tx.toAddress && tx.toAddress !== '-'" :to="`/address/${encodeParam(String(tx.toAddress))}`" class="explorer-link">{{ formatAddressDisplay(tx.toAddress) }}</RouterLink>
+              <RouterLink v-if="tx.toAddress && tx.toAddress !== '-'" :to="`/address/${encodeParam(formatAddressDisplay(tx.toAddress))}`" class="explorer-link">{{ formatAddressDisplay(tx.toAddress) }}</RouterLink>
               <span v-else>-</span>
             </td>
             <td>{{ tx.amount ?? '-' }}</td>

@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { normalizeAddressForLookup } from '../utils/addressFormat'
 
 const api = axios.create({
   baseURL: '/api',
@@ -132,11 +133,12 @@ const addressFromTxSide = (side: unknown): string[] => {
 
 const amountFromTxSideForAddress = (side: unknown, address: string): number => {
   if (!Array.isArray(side)) return 0
+  const lookupComparable = normalizeAddressForLookup(address).toLowerCase()
   let total = 0
   for (const entry of side) {
     if (!entry || typeof entry !== 'object') continue
     const data = entry as GenericRecord
-    if (toString(data.address) !== address) continue
+    if (normalizeAddressForLookup(toString(data.address)).toLowerCase() !== lookupComparable) continue
     total += toNumber(data.amount)
   }
   return total
@@ -320,8 +322,10 @@ export async function fetchTransaction(txId: string): Promise<GenericRecord> {
 
 export async function fetchAddress(address: string): Promise<GenericRecord> {
   const trimmed = address.trim()
+  const lookupAddress = normalizeAddressForLookup(trimmed)
+  const lookupComparable = lookupAddress.toLowerCase()
   try {
-    const response = await api.get(`/address/${encodeURIComponent(trimmed)}`)
+    const response = await api.get(`/address/${encodeURIComponent(lookupAddress)}`)
     return (response.data ?? {}) as GenericRecord
   } catch {
     const scanned = await getRecentBlocks(450)
@@ -332,7 +336,7 @@ export async function fetchAddress(address: string): Promise<GenericRecord> {
     let lastSeenHeight = 0
 
     for (const block of scanned) {
-      if (block.minerAddress === trimmed) {
+      if (normalizeAddressForLookup(block.minerAddress).toLowerCase() === lookupComparable) {
         minedBlocks += 1
         lastSeenHeight = Math.max(lastSeenHeight, block.height)
       }
@@ -344,18 +348,19 @@ export async function fetchAddress(address: string): Promise<GenericRecord> {
         const toSide = txData.to
         const fromAddresses = addressFromTxSide(fromSide)
         const toAddresses = addressFromTxSide(toSide)
-        const involved = fromAddresses.includes(trimmed) || toAddresses.includes(trimmed)
+        const involved = fromAddresses.some((item) => normalizeAddressForLookup(item).toLowerCase() === lookupComparable)
+          || toAddresses.some((item) => normalizeAddressForLookup(item).toLowerCase() === lookupComparable)
         if (!involved) continue
 
         txCount += 1
-        totalOut += amountFromTxSideForAddress(fromSide, trimmed)
-        totalIn += amountFromTxSideForAddress(toSide, trimmed)
+        totalOut += amountFromTxSideForAddress(fromSide, lookupAddress)
+        totalIn += amountFromTxSideForAddress(toSide, lookupAddress)
         lastSeenHeight = Math.max(lastSeenHeight, block.height)
       }
     }
 
     return {
-      address: trimmed,
+      address: lookupAddress,
       minedBlocks,
       transactionsCount: txCount,
       totalIn,
@@ -369,8 +374,10 @@ export async function fetchAddress(address: string): Promise<GenericRecord> {
 
 export async function fetchAddressTxs(address: string): Promise<GenericRecord[]> {
   const trimmed = address.trim()
+  const lookupAddress = normalizeAddressForLookup(trimmed)
+  const lookupComparable = lookupAddress.toLowerCase()
   try {
-    const response = await api.get(`/address-txs/${encodeURIComponent(trimmed)}`)
+    const response = await api.get(`/address-txs/${encodeURIComponent(lookupAddress)}`)
     if (Array.isArray(response.data)) return response.data as GenericRecord[]
 
     const data = response.data as Record<string, unknown>
@@ -391,11 +398,12 @@ export async function fetchAddressTxs(address: string): Promise<GenericRecord[]>
 
         const fromAddresses = addressFromTxSide(fromSide)
         const toAddresses = addressFromTxSide(toSide)
-        const involved = fromAddresses.includes(trimmed) || toAddresses.includes(trimmed)
+        const involved = fromAddresses.some((item) => normalizeAddressForLookup(item).toLowerCase() === lookupComparable)
+          || toAddresses.some((item) => normalizeAddressForLookup(item).toLowerCase() === lookupComparable)
         if (!involved) continue
 
-        const amountIn = amountFromTxSideForAddress(toSide, trimmed)
-        const amountOut = amountFromTxSideForAddress(fromSide, trimmed)
+        const amountIn = amountFromTxSideForAddress(toSide, lookupAddress)
+        const amountOut = amountFromTxSideForAddress(fromSide, lookupAddress)
 
         results.push({
           txId: txIdFromUnknown(txData),
