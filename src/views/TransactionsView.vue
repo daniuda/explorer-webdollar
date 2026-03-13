@@ -10,14 +10,25 @@ const transaction = ref<GenericRecord | null>(null)
 const route = useRoute()
 const router = useRouter()
 
+const firstAddress = (side: unknown): string => {
+  if (!Array.isArray(side) || side.length === 0) return ''
+  const first = side[0]
+  if (!first || typeof first !== 'object') return ''
+  return String((first as GenericRecord).address ?? '')
+}
+
 const fromAddress = computed(() => {
   const data = transaction.value ?? {}
-  return String(data.fromAddress ?? data.from ?? '').trim()
+  const fromSide = data.from
+  const parsed = firstAddress(fromSide)
+  return String(data.fromAddress ?? parsed ?? data.from ?? '').trim()
 })
 
 const toAddress = computed(() => {
   const data = transaction.value ?? {}
-  return String(data.toAddress ?? data.to ?? '').trim()
+  const toSide = data.to
+  const parsed = firstAddress(toSide)
+  return String(data.toAddress ?? parsed ?? data.to ?? '').trim()
 })
 
 const amount = computed(() => String((transaction.value ?? {}).amount ?? '-'))

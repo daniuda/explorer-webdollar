@@ -11,6 +11,31 @@ const transactions = ref<GenericRecord[]>([])
 const route = useRoute()
 const router = useRouter()
 
+const firstAddress = (side: unknown): string => {
+  if (!Array.isArray(side) || side.length === 0) return ''
+  const first = side[0]
+  if (!first || typeof first !== 'object') return ''
+  return String((first as GenericRecord).address ?? '')
+}
+
+const txFrom = (tx: GenericRecord): string => {
+  const fromAddress = tx.fromAddress
+  if (typeof fromAddress === 'string' && fromAddress.trim()) return fromAddress.trim()
+  const fromFirst = firstAddress(tx.from)
+  if (fromFirst) return fromFirst
+  if (typeof tx.from === 'string') return tx.from.trim()
+  return ''
+}
+
+const txTo = (tx: GenericRecord): string => {
+  const toAddress = tx.toAddress
+  if (typeof toAddress === 'string' && toAddress.trim()) return toAddress.trim()
+  const toFirst = firstAddress(tx.to)
+  if (toFirst) return toFirst
+  if (typeof tx.to === 'string') return tx.to.trim()
+  return ''
+}
+
 const runSearch = async (rawAddress: string, updateRoute: boolean) => {
   const trimmed = rawAddress.trim()
   if (!trimmed) return
@@ -129,21 +154,21 @@ watch(
             </td>
             <td class="truncate">
               <RouterLink
-                v-if="tx.from || tx.fromAddress"
-                :to="`/address/${String(tx.from ?? tx.fromAddress)}`"
+                v-if="txFrom(tx)"
+                :to="`/address/${txFrom(tx)}`"
                 class="explorer-link"
               >
-                {{ tx.from ?? tx.fromAddress }}
+                {{ txFrom(tx) }}
               </RouterLink>
               <span v-else>-</span>
             </td>
             <td class="truncate">
               <RouterLink
-                v-if="tx.to || tx.toAddress"
-                :to="`/address/${String(tx.to ?? tx.toAddress)}`"
+                v-if="txTo(tx)"
+                :to="`/address/${txTo(tx)}`"
                 class="explorer-link"
               >
-                {{ tx.to ?? tx.toAddress }}
+                {{ txTo(tx) }}
               </RouterLink>
               <span v-else>-</span>
             </td>

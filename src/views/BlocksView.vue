@@ -11,6 +11,13 @@ const selected = ref<GenericRecord | null>(null)
 const route = useRoute()
 const router = useRouter()
 
+const txIdFromEntry = (tx: unknown): string => {
+  if (typeof tx === 'string') return tx
+  if (!tx || typeof tx !== 'object') return ''
+  const data = tx as GenericRecord
+  return String(data.txId ?? data.hash ?? data.id ?? '')
+}
+
 const selectedTxs = computed(() => {
   const txs = selected.value?.transactions
   return Array.isArray(txs) ? txs : []
@@ -132,9 +139,10 @@ watch(
             </tr>
           </thead>
           <tbody>
-            <tr v-for="tx in selectedTxs" :key="String(tx)">
+            <tr v-for="(tx, index) in selectedTxs" :key="txIdFromEntry(tx) || String(index)">
               <td class="truncate">
-                <RouterLink :to="`/tx/${String(tx)}`" class="explorer-link">{{ tx }}</RouterLink>
+                <RouterLink v-if="txIdFromEntry(tx)" :to="`/tx/${txIdFromEntry(tx)}`" class="explorer-link">{{ txIdFromEntry(tx) }}</RouterLink>
+                <span v-else>-</span>
               </td>
             </tr>
           </tbody>
