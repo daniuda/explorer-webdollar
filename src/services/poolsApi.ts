@@ -102,9 +102,12 @@ const parsePoolStats = (payload: unknown): PoolStats => {
     const atIndex = (index: number): number => {
       if (index >= chunks.length) return 0
       const chunk = chunks[index]
+      if (!chunk) return 0
       const parts = chunk.split(':')
       if (parts.length < 2) return 0
-      const value = Number(parts[1].replace(/[\"{}]/g, '').trim())
+      const rawValue = parts[1]
+      if (!rawValue) return 0
+      const value = Number(rawValue.replace(/[\"{}]/g, '').trim())
       return Number.isFinite(value) ? value : 0
     }
 
