@@ -9,6 +9,7 @@ const error = ref('')
 const transaction = ref<GenericRecord | null>(null)
 const route = useRoute()
 const router = useRouter()
+const encodeParam = (value: string) => encodeURIComponent(value)
 
 const firstAddress = (side: unknown): string => {
   if (!Array.isArray(side) || side.length === 0) return ''
@@ -105,14 +106,14 @@ watch(
           <tr>
             <th>From</th>
             <td class="truncate">
-              <RouterLink v-if="fromAddress" :to="`/address/${fromAddress}`" class="explorer-link">{{ fromAddress }}</RouterLink>
+              <RouterLink v-if="fromAddress" :to="`/address/${encodeParam(fromAddress)}`" class="explorer-link">{{ fromAddress }}</RouterLink>
               <span v-else>-</span>
             </td>
           </tr>
           <tr>
             <th>To</th>
             <td class="truncate">
-              <RouterLink v-if="toAddress" :to="`/address/${toAddress}`" class="explorer-link">{{ toAddress }}</RouterLink>
+              <RouterLink v-if="toAddress" :to="`/address/${encodeParam(toAddress)}`" class="explorer-link">{{ toAddress }}</RouterLink>
               <span v-else>-</span>
             </td>
           </tr>

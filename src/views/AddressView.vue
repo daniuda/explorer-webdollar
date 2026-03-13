@@ -10,6 +10,7 @@ const addressInfo = ref<GenericRecord | null>(null)
 const transactions = ref<GenericRecord[]>([])
 const route = useRoute()
 const router = useRouter()
+const encodeParam = (value: string) => encodeURIComponent(value)
 
 const firstAddress = (side: unknown): string => {
   if (!Array.isArray(side) || side.length === 0) return ''
@@ -145,7 +146,7 @@ watch(
             <td class="truncate">
               <RouterLink
                 v-if="tx.txId || tx.hash"
-                :to="`/tx/${String(tx.txId ?? tx.hash)}`"
+                :to="`/tx/${encodeParam(String(tx.txId ?? tx.hash))}`"
                 class="explorer-link"
               >
                 {{ tx.txId ?? tx.hash }}
@@ -155,7 +156,7 @@ watch(
             <td class="truncate">
               <RouterLink
                 v-if="txFrom(tx)"
-                :to="`/address/${txFrom(tx)}`"
+                :to="`/address/${encodeParam(txFrom(tx))}`"
                 class="explorer-link"
               >
                 {{ txFrom(tx) }}
@@ -165,7 +166,7 @@ watch(
             <td class="truncate">
               <RouterLink
                 v-if="txTo(tx)"
-                :to="`/address/${txTo(tx)}`"
+                :to="`/address/${encodeParam(txTo(tx))}`"
                 class="explorer-link"
               >
                 {{ txTo(tx) }}

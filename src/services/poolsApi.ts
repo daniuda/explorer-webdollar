@@ -152,7 +152,7 @@ const parsePoolMiners = (payload: unknown): PoolMiner[] => {
       const data = item as Record<string, unknown>
       const address = String(data.address ?? data.adress ?? '').trim()
       const balance = normalizeBalance(data.totalPOSBalance)
-      if (address) miners.push({ address: address.slice(0, 40), balance })
+      if (address) miners.push({ address, balance })
     }
   } else if (payload && typeof payload === 'object') {
     const container = payload as Record<string, unknown>
@@ -167,7 +167,7 @@ const parsePoolMiners = (payload: unknown): PoolMiner[] => {
       const data = item as Record<string, unknown>
       const address = String(data.address ?? data.adress ?? '').trim()
       const balance = normalizeBalance(data.totalPOSBalance)
-      if (address) miners.push({ address: address.slice(0, 40), balance })
+      if (address) miners.push({ address, balance })
     }
   }
 
@@ -187,7 +187,7 @@ const parsePoolMiners = (payload: unknown): PoolMiner[] => {
 
   return addresses
     .map((address, index) => ({
-      address: String(address).slice(0, 40),
+      address: String(address),
       balance: normalizeBalance(balances[index] ?? 0),
     }))
     .sort((a, b) => b.balance - a.balance)

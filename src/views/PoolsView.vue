@@ -7,6 +7,7 @@ const loading = ref(false)
 const error = ref('')
 const pools = ref<PoolSummary[]>([])
 const markets = ref<MarketSummary>({ webdUsdt: 0, webdEth: 0 })
+const encodeParam = (value: string) => encodeURIComponent(value)
 
 const formatNumber = (value: number, decimals = 2): string =>
   value.toLocaleString('en-US', {
@@ -100,7 +101,7 @@ onMounted(() => {
         <tbody>
           <tr v-for="miner in pool.miners" :key="`${pool.name}-${miner.address}-${miner.balance}`">
             <td class="truncate">
-              <RouterLink :to="`/address/${miner.address}`" class="explorer-link">{{ miner.address }}</RouterLink>
+              <RouterLink :to="`/address/${encodeParam(miner.address)}`" class="explorer-link">{{ miner.address }}</RouterLink>
             </td>
             <td>{{ formatNumber(miner.balance, 4) }}</td>
             <td>{{ formatNumber(miner.balance * markets.webdUsdt, 2) }}</td>

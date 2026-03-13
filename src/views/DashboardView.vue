@@ -2,6 +2,8 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { fetchChain, fetchLatestBlocks, type GenericRecord } from '../services/explorerApi'
 
+const encodeParam = (value: string) => encodeURIComponent(value)
+
 const loading = ref(true)
 const error = ref('')
 const chain = ref<Record<string, unknown>>({})
@@ -93,7 +95,7 @@ onUnmounted(() => {
             <td class="truncate">
               <RouterLink
                 v-if="block.minerAddress"
-                :to="`/address/${String(block.minerAddress)}`"
+                :to="`/address/${encodeParam(String(block.minerAddress))}`"
                 class="explorer-link"
               >
                 {{ block.minerAddress }}

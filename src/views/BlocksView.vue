@@ -10,6 +10,7 @@ const latest = ref<GenericRecord[]>([])
 const selected = ref<GenericRecord | null>(null)
 const route = useRoute()
 const router = useRouter()
+const encodeParam = (value: string) => encodeURIComponent(value)
 
 const txIdFromEntry = (tx: unknown): string => {
   if (typeof tx === 'string') return tx
@@ -115,7 +116,7 @@ watch(
             <td class="truncate">
               <RouterLink
                 v-if="selected.minerAddress"
-                :to="`/address/${String(selected.minerAddress)}`"
+                :to="`/address/${encodeParam(String(selected.minerAddress))}`"
                 class="explorer-link"
               >
                 {{ selected.minerAddress }}
@@ -141,7 +142,7 @@ watch(
           <tbody>
             <tr v-for="(tx, index) in selectedTxs" :key="txIdFromEntry(tx) || String(index)">
               <td class="truncate">
-                <RouterLink v-if="txIdFromEntry(tx)" :to="`/tx/${txIdFromEntry(tx)}`" class="explorer-link">{{ txIdFromEntry(tx) }}</RouterLink>
+                <RouterLink v-if="txIdFromEntry(tx)" :to="`/tx/${encodeParam(txIdFromEntry(tx))}`" class="explorer-link">{{ txIdFromEntry(tx) }}</RouterLink>
                 <span v-else>-</span>
               </td>
             </tr>
@@ -168,7 +169,7 @@ watch(
             <td class="truncate">
               <RouterLink
                 v-if="block.hash"
-                :to="`/block/${String(block.hash)}`"
+                :to="`/block/${encodeParam(String(block.hash))}`"
                 class="explorer-link"
               >
                 {{ block.hash }}
