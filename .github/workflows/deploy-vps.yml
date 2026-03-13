@@ -29,24 +29,27 @@ jobs:
       - name: Archive dist
         run: tar -czf explorer-webdollar-dist.tar.gz dist
 
+      - name: Configure SSH key
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+
       - name: Upload archive to VPS /tmp
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT || 22 }}
-          source: explorer-webdollar-dist.tar.gz
-          target: /tmp/
+        shell: bash
+        run: |
+          set -euo pipefail
+          scp -i ~/.ssh/deploy_key -P "${{ secrets.VPS_PORT || 22 }}" explorer-webdollar-dist.tar.gz "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/explorer-webdollar-dist.tar.gz"
 
       - name: Extract archive and publish with sudo
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT || 22 }}
-          script: |
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/deploy_key -p "${{ secrets.VPS_PORT || 22 }}" "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" '
             set -e
             sudo mkdir -p /var/www/explorer-webdollar
             sudo rm -rf /var/www/explorer-webdollar/*
@@ -55,3 +58,4 @@ jobs:
             sudo rm -rf /tmp/dist /tmp/explorer-webdollar-dist.tar.gz
             sudo nginx -t
             sudo systemctl reload nginx
+          '
