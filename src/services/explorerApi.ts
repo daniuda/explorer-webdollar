@@ -234,10 +234,10 @@ export async function fetchLatestBlocks(): Promise<GenericRecord[]> {
 
 export async function fetchLatestTransactions(limit = 10): Promise<GenericRecord[]> {
   const normalizedLimit = Math.max(1, limit)
-  const blocks = await getRecentBlocks(250)
+  const blocks = await getRecentBlocks(300)
   const latest: GenericRecord[] = []
 
-  for (const block of blocks) {
+  const collectFromBlock = (block: NormalizedBlock) => {
     for (const tx of block.transactions) {
       const txId = txIdFromUnknown(tx)
       if (!txId) continue
@@ -260,8 +260,31 @@ export async function fetchLatestTransactions(limit = 10): Promise<GenericRecord
       })
 
       if (latest.length >= normalizedLimit) {
-        return latest
+        return true
       }
+    }
+    return false
+  }
+
+  for (const block of blocks) {
+    if (collectFromBlock(block)) return latest
+  }
+
+  // Fallback: recent blocks can legitimately have zero transactions; continue walking backwards.
+  const oldestBlock = blocks.length > 0 ? blocks[blocks.length - 1] : undefined
+  let cursorHash = oldestBlock ? oldestBlock.hashPrev : toString((await fetchChain()).hash)
+  const seen = new Set<string>(blocks.map((block) => block.hash))
+
+  for (let scanned = 0; scanned < 2000 && cursorHash; scanned += 1) {
+    if (seen.has(cursorHash)) break
+    seen.add(cursorHash)
+
+    try {
+      const block = normalizeBlock(await fetchBlockRaw(cursorHash))
+      if (collectFromBlock(block)) return latest
+      cursorHash = block.hashPrev
+    } catch {
+      break
     }
   }
 
