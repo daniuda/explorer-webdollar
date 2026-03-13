@@ -171,6 +171,16 @@ p {
   text-overflow: ellipsis;
 }
 
+.explorer-link {
+  color: #7dd3fc;
+  text-decoration: none;
+}
+
+.explorer-link:hover {
+  color: #e7f0ff;
+  text-decoration: underline;
+}
+
 .search-row {
   display: flex;
   gap: 10px;
@@ -225,6 +235,39 @@ p {
   max-height: 420px;
 }
 
+.raw-json summary {
+  cursor: pointer;
+  color: #8fa8d4;
+  margin: 12px 0;
+}
+
+.inline-panel {
+  margin-top: 12px;
+}
+
+.inline-panel h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.pool-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.pool-stat-card {
+  background: #07101d;
+  border: 1px solid #1a2a46;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.pool-stat-card .metric-value {
+  font-size: 18px;
+}
+
 @media (max-width: 980px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -237,6 +280,10 @@ p {
   }
 
   .metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pool-stats-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

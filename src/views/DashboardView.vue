@@ -80,8 +80,26 @@ onUnmounted(() => {
         <tbody>
           <tr v-for="block in blocks" :key="String(block.hash ?? block.height)">
             <td>{{ block.height ?? '-' }}</td>
-            <td class="truncate">{{ block.hash ?? '-' }}</td>
-            <td class="truncate">{{ block.minerAddress ?? '-' }}</td>
+            <td class="truncate">
+              <RouterLink
+                v-if="block.hash"
+                :to="`/block/${String(block.hash)}`"
+                class="explorer-link"
+              >
+                {{ block.hash }}
+              </RouterLink>
+              <span v-else>-</span>
+            </td>
+            <td class="truncate">
+              <RouterLink
+                v-if="block.minerAddress"
+                :to="`/address/${String(block.minerAddress)}`"
+                class="explorer-link"
+              >
+                {{ block.minerAddress }}
+              </RouterLink>
+              <span v-else>-</span>
+            </td>
             <td>{{ block.transactions ? (Array.isArray(block.transactions) ? block.transactions.length : '-') : '-' }}</td>
           </tr>
         </tbody>
