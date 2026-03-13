@@ -75,24 +75,69 @@ const parsePoolStats = (payload: unknown): PoolStats => {
     blocksBeingConfirmed: 0,
   }
 
-  if (!payload || typeof payload !== 'object') return stats
-  const data = payload as Record<string, unknown>
+  const parseFromObject = (data: Record<string, unknown>): PoolStats => {
+    const output: PoolStats = { ...stats }
 
-  const readNumber = (keys: string[]): number => {
-    for (const key of keys) {
-      const value = Number(data[key] ?? 0)
-      if (Number.isFinite(value)) return value
+    const readNumber = (keys: string[]): number => {
+      for (const key of keys) {
+        const value = Number(data[key] ?? Number.NaN)
+        if (Number.isFinite(value)) return value
+      }
+      return 0
     }
-    return 0
+
+    output.onlineMiners = readNumber(['onlineMiners', 'minersOnline', 'miners_online', 'online_mineri'])
+    output.blocksPaid = readNumber(['blocksPaid', 'blocks_paid', 'blocks_confirmed_and_paid', 'blocuri_platite'])
+    output.blocksUnpaid = readNumber(['blocksUnpaid', 'blocks_unpaid', 'blocks_confirmed', 'blocuri_neplatite'])
+    output.blocksUnconfirmed = readNumber(['blocksUnconfirmed', 'blocks_unconfirmed', 'blocuri_unconfirmed'])
+    output.blocksBeingConfirmed = readNumber(['blocksBeingConfirmed', 'blocks_being_confirmed'])
+
+    return output
   }
 
-  stats.onlineMiners = readNumber(['onlineMiners', 'minersOnline', 'miners_online', 'online_mineri'])
-  stats.blocksPaid = readNumber(['blocksPaid', 'blocks_paid', 'blocks_confirmed_and_paid', 'blocuri_platite'])
-  stats.blocksUnpaid = readNumber(['blocksUnpaid', 'blocks_unpaid', 'blocks_confirmed', 'blocuri_neplatite'])
-  stats.blocksUnconfirmed = readNumber(['blocks_unconfirmed', 'blocuri_unconfirmed'])
-  stats.blocksBeingConfirmed = readNumber(['blocksBeingConfirmed', 'blocks_being_confirmed'])
+  const parseLegacyString = (raw: string): PoolStats => {
+    const output: PoolStats = { ...stats }
+    const chunks = raw.split(',')
 
-  return stats
+    const atIndex = (index: number): number => {
+      if (index >= chunks.length) return 0
+      const chunk = chunks[index]
+      const parts = chunk.split(':')
+      if (parts.length < 2) return 0
+      const value = Number(parts[1].replace(/[\"{}]/g, '').trim())
+      return Number.isFinite(value) ? value : 0
+    }
+
+    // Compatibil cu index.py (fallback pe pozitii)
+    output.onlineMiners = atIndex(2)
+    output.blocksPaid = atIndex(3)
+    output.blocksUnconfirmed = atIndex(4)
+    output.blocksUnpaid = atIndex(5)
+    output.blocksBeingConfirmed = atIndex(6)
+    return output
+  }
+
+  if (!payload) return stats
+
+  if (typeof payload === 'object') {
+    return parseFromObject(payload as Record<string, unknown>)
+  }
+
+  if (typeof payload !== 'string') return stats
+
+  const raw = payload.trim()
+  if (!raw) return stats
+
+  try {
+    const parsed = JSON.parse(raw)
+    if (parsed && typeof parsed === 'object') {
+      return parseFromObject(parsed as Record<string, unknown>)
+    }
+  } catch {
+    // Continue with legacy fallback
+  }
+
+  return parseLegacyString(raw)
 }
 
 const parsePoolMiners = (payload: unknown): PoolMiner[] => {
