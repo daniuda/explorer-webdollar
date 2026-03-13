@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { fetchMarkets, fetchPools, type MarketSummary, type PoolSummary } from '../services/poolsApi'
+import { formatAddressDisplay } from '../utils/addressFormat'
 
 const loading = ref(false)
 const error = ref('')
@@ -101,7 +102,7 @@ onMounted(() => {
         <tbody>
           <tr v-for="miner in pool.miners" :key="`${pool.name}-${miner.address}-${miner.balance}`">
             <td class="truncate">
-              <RouterLink :to="`/address/${encodeParam(miner.address)}`" class="explorer-link">{{ miner.address }}</RouterLink>
+              <RouterLink :to="`/address/${encodeParam(miner.address)}`" class="explorer-link">{{ formatAddressDisplay(miner.address) }}</RouterLink>
             </td>
             <td>{{ formatNumber(miner.balance, 4) }}</td>
             <td>{{ formatNumber(miner.balance * markets.webdUsdt, 2) }}</td>

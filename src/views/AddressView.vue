@@ -2,6 +2,7 @@
 import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fetchAddress, fetchAddressTxs, type GenericRecord } from '../services/explorerApi'
+import { formatAddressDisplay } from '../utils/addressFormat'
 
 const address = ref('')
 const loading = ref(false)
@@ -110,7 +111,7 @@ watch(
         <tbody>
           <tr>
             <th>Address</th>
-            <td class="truncate">{{ addressInfo.address ?? address }}</td>
+            <td class="truncate">{{ formatAddressDisplay(addressInfo.address ?? address) }}</td>
           </tr>
           <tr>
             <th>Balance</th>
@@ -159,7 +160,7 @@ watch(
                 :to="`/address/${encodeParam(txFrom(tx))}`"
                 class="explorer-link"
               >
-                {{ txFrom(tx) }}
+                {{ formatAddressDisplay(txFrom(tx)) }}
               </RouterLink>
               <span v-else>-</span>
             </td>
@@ -169,7 +170,7 @@ watch(
                 :to="`/address/${encodeParam(txTo(tx))}`"
                 class="explorer-link"
               >
-                {{ txTo(tx) }}
+                {{ formatAddressDisplay(txTo(tx)) }}
               </RouterLink>
               <span v-else>-</span>
             </td>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { fetchChain, fetchLatestBlocks, type GenericRecord } from '../services/explorerApi'
+import { formatAddressDisplay } from '../utils/addressFormat'
 
 const encodeParam = (value: string) => encodeURIComponent(value)
 
@@ -98,7 +99,7 @@ onUnmounted(() => {
                 :to="`/address/${encodeParam(String(block.minerAddress))}`"
                 class="explorer-link"
               >
-                {{ block.minerAddress }}
+                {{ formatAddressDisplay(block.minerAddress) }}
               </RouterLink>
               <span v-else>-</span>
             </td>

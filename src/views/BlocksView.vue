@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fetchBlockByParam, fetchLatestBlocks, type GenericRecord } from '../services/explorerApi'
+import { formatAddressDisplay } from '../utils/addressFormat'
 
 const loading = ref(false)
 const error = ref('')
@@ -119,7 +120,7 @@ watch(
                 :to="`/address/${encodeParam(String(selected.minerAddress))}`"
                 class="explorer-link"
               >
-                {{ selected.minerAddress }}
+                {{ formatAddressDisplay(selected.minerAddress) }}
               </RouterLink>
               <span v-else>-</span>
             </td>
