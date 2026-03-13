@@ -31,6 +31,24 @@ type NormalizedBlock = GenericRecord & {
   transactions: unknown[]
 }
 
+type RecentBlocksCache = {
+  blocks: NormalizedBlock[]
+  limit: number
+  expiry: number
+  pending: Promise<NormalizedBlock[]> | null
+  pendingLimit: number
+}
+
+const RECENT_BLOCKS_TTL_MS = 30_000
+
+const recentBlocksCache: RecentBlocksCache = {
+  blocks: [],
+  limit: 0,
+  expiry: 0,
+  pending: null,
+  pendingLimit: 0,
+}
+
 const safeArray = (value: unknown): GenericRecord[] => {
   if (Array.isArray(value)) return value as GenericRecord[]
   return []
@@ -167,13 +185,45 @@ async function scanRecentBlocks(limit: number): Promise<NormalizedBlock[]> {
   return blocks
 }
 
+async function getRecentBlocks(limit: number): Promise<NormalizedBlock[]> {
+  const normalizedLimit = Math.max(1, limit)
+  const now = Date.now()
+
+  if (
+    recentBlocksCache.blocks.length > 0
+    && recentBlocksCache.limit >= normalizedLimit
+    && recentBlocksCache.expiry > now
+  ) {
+    return recentBlocksCache.blocks.slice(0, normalizedLimit)
+  }
+
+  if (recentBlocksCache.pending && recentBlocksCache.pendingLimit >= normalizedLimit) {
+    const blocks = await recentBlocksCache.pending
+    return blocks.slice(0, normalizedLimit)
+  }
+
+  recentBlocksCache.pendingLimit = normalizedLimit
+  recentBlocksCache.pending = scanRecentBlocks(normalizedLimit)
+
+  try {
+    const blocks = await recentBlocksCache.pending
+    recentBlocksCache.blocks = blocks
+    recentBlocksCache.limit = normalizedLimit
+    recentBlocksCache.expiry = Date.now() + RECENT_BLOCKS_TTL_MS
+    return blocks
+  } finally {
+    recentBlocksCache.pending = null
+    recentBlocksCache.pendingLimit = 0
+  }
+}
+
 export async function fetchChain(): Promise<ChainResponse> {
   const response = await api.get('/chain')
   return response.data as ChainResponse
 }
 
 export async function fetchLatestBlocks(): Promise<GenericRecord[]> {
-  const scanned = await scanRecentBlocks(12)
+  const scanned = await getRecentBlocks(12)
   if (scanned.length > 0) return scanned
 
   const data = await firstSuccessful<unknown>([async () => (await api.get('/blocks')).data])
@@ -186,7 +236,7 @@ export async function fetchBlockByParam(param: string): Promise<GenericRecord> {
     return normalizeBlock(await fetchBlockRaw(trimmed))
   } catch {
     // Fallback: search recent blocks by height/hash when direct lookup fails.
-    const scanned = await scanRecentBlocks(250)
+    const scanned = await getRecentBlocks(250)
     const targetHeight = Number(trimmed)
     const byHeight = Number.isFinite(targetHeight)
       ? scanned.find((block) => block.height === targetHeight)
@@ -206,7 +256,7 @@ export async function fetchTransaction(txId: string): Promise<GenericRecord> {
     const response = await api.get(`/tx/${encodeURIComponent(trimmed)}`)
     return (response.data ?? {}) as GenericRecord
   } catch {
-    const scanned = await scanRecentBlocks(600)
+    const scanned = await getRecentBlocks(600)
     for (const block of scanned) {
       for (const tx of block.transactions) {
         if (txIdFromUnknown(tx) !== trimmed) continue
@@ -238,7 +288,7 @@ export async function fetchAddress(address: string): Promise<GenericRecord> {
     const response = await api.get(`/address/${encodeURIComponent(trimmed)}`)
     return (response.data ?? {}) as GenericRecord
   } catch {
-    const scanned = await scanRecentBlocks(700)
+    const scanned = await getRecentBlocks(450)
     let minedBlocks = 0
     let txCount = 0
     let totalIn = 0
@@ -293,7 +343,7 @@ export async function fetchAddressTxs(address: string): Promise<GenericRecord[]>
 
     return []
   } catch {
-    const scanned = await scanRecentBlocks(700)
+    const scanned = await getRecentBlocks(450)
     const results: GenericRecord[] = []
 
     for (const block of scanned) {
