@@ -28,13 +28,13 @@ export type MarketSummary = {
 export const POOLS: Array<{ name: string; miners: string; stats: string }> = [
   {
     name: 'iudaWEBD',
-    miners: 'http://daniuda.ddns.net:8080/pools/miners',
-    stats: 'http://daniuda.ddns.net:8080/pools/stats',
+    miners: '/pool-proxy/daniuda/miners',
+    stats: '/pool-proxy/daniuda/stats',
   },
   {
     name: 'Spyclub',
-    miners: 'https://node.spyclub.ro:8080/pools/miners',
-    stats: 'https://node.spyclub.ro:8080/pools/stats',
+    miners: '/pool-proxy/spyclub/miners',
+    stats: '/pool-proxy/spyclub/stats',
   },
 ]
 
