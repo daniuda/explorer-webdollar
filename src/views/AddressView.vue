@@ -15,9 +15,22 @@ const encodeParam = (value: string) => encodeURIComponent(value)
 
 const latestTenTransactions = computed(() => transactions.value.slice(0, 10))
 
+const formatWalletAmount = (value: unknown): string => {
+  if (value === null || value === undefined || value === '') return '-'
+
+  const numeric = Number(String(value).replace(/,/g, '').trim())
+  if (!Number.isFinite(numeric)) return String(value)
+
+  const normalized = numeric >= 10000 ? numeric / 10000 : numeric
+  return `${normalized.toLocaleString('en-US', {
+    minimumFractionDigits: 4,
+    maximumFractionDigits: 4,
+  })} WEBD`
+}
+
 const walletValue = computed(() => {
   const info = addressInfo.value ?? {}
-  return info.balance ?? info.amount ?? info.netAmount ?? '-'
+  return formatWalletAmount(info.balance ?? info.amount ?? info.netAmount)
 })
 
 const firstAddress = (side: unknown): string => {
