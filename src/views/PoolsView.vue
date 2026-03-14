@@ -7,7 +7,14 @@ import { formatAddressDisplay } from '../utils/addressFormat'
 const loading = ref(false)
 const error = ref('')
 const pools = ref<PoolSummary[]>([])
-const markets = ref<MarketSummary>({ webdUsdt: 0, webdEth: 0 })
+const markets = ref<MarketSummary>({
+  webdUsdt: 0,
+  webdVd: 0,
+  vdUsdt: 0,
+  webdUsd: 0,
+  webdUsdFromVd: 0,
+  usdComputedAt: '',
+})
 const encodeParam = (value: string) => encodeURIComponent(value)
 
 const formatNumber = (value: number, decimals = 2): string =>
@@ -17,9 +24,18 @@ const formatNumber = (value: number, decimals = 2): string =>
   })
 
 const marketCards = computed(() => [
-  { label: 'Indoex WEBD / USDT (1M WEBD)', value: `${formatNumber(markets.value.webdUsdt * 1_000_000, 2)} USDT` },
-  { label: 'Indoex WEBD / ETH (1M WEBD)', value: `${formatNumber(markets.value.webdEth * 1_000_000, 8)} ETH` },
+  { label: 'Vindax WEBD / USDT (1M WEBD)', value: `${formatNumber(markets.value.webdUsdt * 1_000_000, 2)} USDT` },
+  { label: 'Vindax WEBD / VD (1M WEBD)', value: `${formatNumber(markets.value.webdVd * 1_000_000, 2)} VD` },
+  { label: 'Vindax VD / USDT (daily cache)', value: `${formatNumber(markets.value.vdUsdt, 6)} USDT` },
+  { label: 'Derived WEBD / USD (1M WEBD)', value: `${formatNumber(markets.value.webdUsd * 1_000_000, 2)} USD` },
 ])
+
+const conversionTimeLabel = computed(() => {
+  if (!markets.value.usdComputedAt) return '-'
+  const date = new Date(markets.value.usdComputedAt)
+  if (Number.isNaN(date.getTime())) return markets.value.usdComputedAt
+  return date.toLocaleString('ro-RO')
+})
 
 const refresh = async () => {
   loading.value = true
@@ -59,6 +75,8 @@ onMounted(() => {
       </article>
     </div>
 
+    <p class="metric-label">VD -> USDT conversion cached at: {{ conversionTimeLabel }}</p>
+
     <p v-if="loading">Loading pools...</p>
 
     <section v-for="pool in pools" :key="pool.name" class="panel">
@@ -71,7 +89,7 @@ onMounted(() => {
         </div>
         <div class="pool-stat-card">
           <p class="metric-label">Value USD</p>
-          <p class="metric-value">{{ formatNumber(pool.totalPosWebd * markets.webdUsdt, 2) }} USD</p>
+          <p class="metric-value">{{ formatNumber(pool.totalPosWebd * markets.webdUsd, 2) }} USD</p>
         </div>
         <div class="pool-stat-card">
           <p class="metric-label">Online Miners</p>
@@ -105,7 +123,7 @@ onMounted(() => {
               <RouterLink :to="`/address/${encodeParam(formatAddressDisplay(miner.address))}`" class="explorer-link">{{ formatAddressDisplay(miner.address) }}</RouterLink>
             </td>
             <td>{{ formatNumber(miner.balance, 4) }}</td>
-            <td>{{ formatNumber(miner.balance * markets.webdUsdt, 2) }}</td>
+            <td>{{ formatNumber(miner.balance * markets.webdUsd, 2) }}</td>
           </tr>
         </tbody>
       </table>

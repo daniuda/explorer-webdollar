@@ -22,7 +22,11 @@ export type PoolSummary = {
 
 export type MarketSummary = {
   webdUsdt: number
-  webdEth: number
+  webdVd: number
+  vdUsdt: number
+  webdUsd: number
+  webdUsdFromVd: number
+  usdComputedAt: string
 }
 
 export const POOLS: Array<{ name: string; miners: string; stats: string }> = [
@@ -38,9 +42,19 @@ export const POOLS: Array<{ name: string; miners: string; stats: string }> = [
   },
 ]
 
-const MARKET_URLS = {
-  WEBD_USDT: 'https://api.indoex.io/getSelectedMarket/WEBD_USDT',
-  WEBD_ETH: 'https://api.indoex.io/getSelectedMarket/WEBD_ETH',
+const VINDAX_TICKER_ENDPOINT = '/market-proxy/vindax/ticker/24hr'
+const VINDAX_SYMBOLS = {
+  WEBD_USDT: 'WEBDUSDT',
+  WEBD_VD: 'WEBDVD',
+  VD_USDT: 'VDUSDT',
+}
+const VD_USDT_DAILY_CACHE_KEY = 'webdExplorer.vdUsdtDailyCache.v1'
+const ONE_DAY_MS = 24 * 60 * 60 * 1000
+
+type DailyVdUsdtCache = {
+  vdUsdt: number
+  computedAt: string
+  expiresAt: number
 }
 
 const addressRegex = /"(?:address|adress)"\s*:\s*"([^"]+)"/gi
@@ -56,14 +70,37 @@ const normalizeBalance = (value: unknown): number => {
   return numeric
 }
 
-const parseMarketLast = (payload: unknown): number => {
+const parseVindaxLast = (payload: unknown): number => {
   if (!payload || typeof payload !== 'object') return 0
-  const marketDetails = (payload as Record<string, unknown>).marketdetails
-  if (!Array.isArray(marketDetails) || marketDetails.length === 0) return 0
-  const first = marketDetails[0]
-  if (!first || typeof first !== 'object') return 0
-  const last = Number((first as Record<string, unknown>).last ?? 0)
+  const data = payload as Record<string, unknown>
+  const last = Number(data.lastPrice ?? data.last ?? 0)
   return Number.isFinite(last) ? last : 0
+}
+
+const isBrowser = typeof window !== 'undefined'
+
+const readDailyVdUsdtCache = (): DailyVdUsdtCache | null => {
+  if (!isBrowser) return null
+  try {
+    const raw = window.localStorage.getItem(VD_USDT_DAILY_CACHE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as DailyVdUsdtCache
+    if (!parsed || typeof parsed !== 'object') return null
+    if (!Number.isFinite(parsed.vdUsdt) || !Number.isFinite(parsed.expiresAt)) return null
+    if (Date.now() >= parsed.expiresAt) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+const writeDailyVdUsdtCache = (cache: DailyVdUsdtCache): void => {
+  if (!isBrowser) return
+  try {
+    window.localStorage.setItem(VD_USDT_DAILY_CACHE_KEY, JSON.stringify(cache))
+  } catch {
+    // Ignore storage write failures.
+  }
 }
 
 const parsePoolStats = (payload: unknown): PoolStats => {
@@ -202,15 +239,53 @@ async function safeGet<T = unknown>(url: string): Promise<T | null> {
   }
 }
 
+async function safeGetWithParams<T = unknown>(url: string, params: Record<string, unknown>): Promise<T | null> {
+  try {
+    const response = await http.get(url, { params })
+    return response.data as T
+  } catch {
+    return null
+  }
+}
+
+async function fetchVindaxLastPrice(symbol: string): Promise<number> {
+  const raw = await safeGetWithParams(VINDAX_TICKER_ENDPOINT, { symbol })
+  return parseVindaxLast(raw)
+}
+
+async function getDailyVdUsdtRate(): Promise<DailyVdUsdtCache> {
+  const cached = readDailyVdUsdtCache()
+  if (cached) return cached
+
+  const freshRate = await fetchVindaxLastPrice(VINDAX_SYMBOLS.VD_USDT)
+  const computedAt = new Date().toISOString()
+  const nextCache: DailyVdUsdtCache = {
+    vdUsdt: freshRate,
+    computedAt,
+    expiresAt: Date.now() + ONE_DAY_MS,
+  }
+  writeDailyVdUsdtCache(nextCache)
+  return nextCache
+}
+
 export async function fetchMarkets(): Promise<MarketSummary> {
-  const [usdtRaw, ethRaw] = await Promise.all([
-    safeGet(MARKET_URLS.WEBD_USDT),
-    safeGet(MARKET_URLS.WEBD_ETH),
+  const [webdUsdt, webdVd, vdDaily] = await Promise.all([
+    fetchVindaxLastPrice(VINDAX_SYMBOLS.WEBD_USDT),
+    fetchVindaxLastPrice(VINDAX_SYMBOLS.WEBD_VD),
+    getDailyVdUsdtRate(),
   ])
 
+  const vdUsdt = vdDaily.vdUsdt
+  const webdUsdFromVd = webdVd > 0 && vdUsdt > 0 ? webdVd * vdUsdt : 0
+  const webdUsd = webdUsdt > 0 ? webdUsdt : webdUsdFromVd
+
   return {
-    webdUsdt: parseMarketLast(usdtRaw),
-    webdEth: parseMarketLast(ethRaw),
+    webdUsdt,
+    webdVd,
+    vdUsdt,
+    webdUsd,
+    webdUsdFromVd,
+    usdComputedAt: vdDaily.computedAt,
   }
 }
 
