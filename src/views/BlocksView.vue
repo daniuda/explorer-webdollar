@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fetchBlockByParam, fetchLatestBlocks, type GenericRecord } from '../services/explorerApi'
 import { formatAddressDisplay } from '../utils/addressFormat'
+import { formatWebdAmount } from '../utils/webdAmount'
 
 const loading = ref(false)
 const error = ref('')
@@ -19,6 +20,19 @@ const txIdFromEntry = (tx: unknown): string => {
   const data = tx as GenericRecord
   return String(data.txId ?? data.hash ?? data.id ?? '')
 }
+
+const txAmountFromEntry = (tx: unknown): unknown => {
+  if (!tx || typeof tx !== 'object') return null
+  const data = tx as GenericRecord
+
+  if (Array.isArray(data.to) && data.to.length > 0 && typeof data.to[0] === 'object') {
+    return (data.to[0] as GenericRecord).amount
+  }
+
+  return data.amount ?? null
+}
+
+const formatBlockAmount = (value: unknown) => formatWebdAmount(value)
 
 const selectedTxs = computed(() => {
   const txs = selected.value?.transactions
@@ -49,7 +63,8 @@ const selectedHashChainPrev = computed(() => String(selectedDataLevel1.value.has
 const selectedNonce = computed(() => selectedDataLevel1.value.nonce ?? '-')
 const selectedDifficulty = computed(() => selectedDataLevel1.value.difficulty ?? '-')
 const selectedHashChain = computed(() => selectedDataLevel1.value.hashChain ?? '-')
-const selectedReward = computed(() => selectedDataLevel1.value.reward ?? '-')
+const selectedReward = computed(() => formatWebdAmount(selected.value?.rewardWebd ?? selectedDataLevel1.value.reward))
+const selectedTotalWebd = computed(() => formatWebdAmount(selected.value?.totalWebd))
 const selectedResolvedBy = computed(() => selectedDataLevel1.value.resolvedBy ?? selectedDataLevel2.value.resolvedBy ?? '-')
 
 const loadLatest = async () => {
@@ -199,6 +214,10 @@ watch(
             <td>{{ selectedReward }}</td>
           </tr>
           <tr>
+            <th>Total WEBD in Block</th>
+            <td>{{ selectedTotalWebd }}</td>
+          </tr>
+          <tr>
             <th>Resolved By</th>
             <td>{{ selectedResolvedBy }}</td>
           </tr>
@@ -215,6 +234,7 @@ watch(
           <thead>
             <tr>
               <th>Tx</th>
+              <th>Amount</th>
             </tr>
           </thead>
           <tbody>
@@ -223,6 +243,7 @@ watch(
                 <RouterLink v-if="txIdFromEntry(tx)" :to="`/tx/${encodeParam(txIdFromEntry(tx))}`" class="explorer-link">{{ txIdFromEntry(tx) }}</RouterLink>
                 <span v-else>-</span>
               </td>
+              <td>{{ formatWebdAmount(txAmountFromEntry(tx)) }}</td>
             </tr>
           </tbody>
         </table>
@@ -238,6 +259,8 @@ watch(
           <tr>
             <th>Height</th>
             <th>Hash</th>
+            <th>Miner</th>
+            <th>Total WEBD</th>
             <th>Timestamp</th>
           </tr>
         </thead>
@@ -254,6 +277,17 @@ watch(
               </RouterLink>
               <span v-else>-</span>
             </td>
+            <td class="truncate">
+              <RouterLink
+                v-if="block.minerAddress"
+                :to="`/address/${encodeParam(formatAddressDisplay(block.minerAddress))}`"
+                class="explorer-link"
+              >
+                {{ formatAddressDisplay(block.minerAddress) }}
+              </RouterLink>
+              <span v-else>-</span>
+            </td>
+            <td>{{ formatBlockAmount(block.totalWebd) }}</td>
             <td>{{ block.timestamp ?? block.timeStamp ?? '-' }}</td>
           </tr>
         </tbody>

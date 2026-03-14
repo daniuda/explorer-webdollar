@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fetchLatestTransactions, fetchTransaction, type GenericRecord } from '../services/explorerApi'
 import { formatAddressDisplay } from '../utils/addressFormat'
+import { formatWebdAmount } from '../utils/webdAmount'
 
 const txId = ref('')
 const loading = ref(false)
@@ -35,7 +36,7 @@ const toAddress = computed(() => {
   return String(data.toAddress ?? parsed ?? data.to ?? '').trim()
 })
 
-const amount = computed(() => String((transaction.value ?? {}).amount ?? '-'))
+const amount = computed(() => formatWebdAmount((transaction.value ?? {}).amount))
 const hash = computed(() => String((transaction.value ?? {}).hash ?? (transaction.value ?? {}).txId ?? txId.value))
 
 const runSearch = async (rawTxId: string, updateRoute: boolean) => {
@@ -171,7 +172,7 @@ watch(
               <RouterLink v-if="tx.toAddress && tx.toAddress !== '-'" :to="`/address/${encodeParam(formatAddressDisplay(tx.toAddress))}`" class="explorer-link">{{ formatAddressDisplay(tx.toAddress) }}</RouterLink>
               <span v-else>-</span>
             </td>
-            <td>{{ tx.amount ?? '-' }}</td>
+            <td>{{ formatWebdAmount(tx.amount) }}</td>
             <td>{{ tx.blockHeight ?? '-' }}</td>
           </tr>
         </tbody>

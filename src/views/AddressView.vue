@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fetchAddress, fetchAddressTxs, type GenericRecord } from '../services/explorerApi'
 import { formatAddressDisplay } from '../utils/addressFormat'
+import { formatWebdAmount } from '../utils/webdAmount'
 
 const address = ref('')
 const loading = ref(false)
@@ -15,22 +16,9 @@ const encodeParam = (value: string) => encodeURIComponent(value)
 
 const latestTenTransactions = computed(() => transactions.value.slice(0, 10))
 
-const formatWalletAmount = (value: unknown): string => {
-  if (value === null || value === undefined || value === '') return '-'
-
-  const numeric = Number(String(value).replace(/,/g, '').trim())
-  if (!Number.isFinite(numeric)) return String(value)
-
-  const normalized = numeric >= 10000 ? numeric / 10000 : numeric
-  return `${normalized.toLocaleString('en-US', {
-    minimumFractionDigits: 4,
-    maximumFractionDigits: 4,
-  })} WEBD`
-}
-
 const walletValue = computed(() => {
   const info = addressInfo.value ?? {}
-  return formatWalletAmount(info.balance ?? info.amount ?? info.netAmount)
+  return formatWebdAmount(info.balance ?? info.amount ?? info.netAmount)
 })
 
 const firstAddress = (side: unknown): string => {
@@ -208,7 +196,7 @@ watch(
               </RouterLink>
               <span v-else>-</span>
             </td>
-            <td>{{ tx.amount ?? '-' }}</td>
+            <td>{{ formatWebdAmount(tx.amount) }}</td>
           </tr>
         </tbody>
       </table>

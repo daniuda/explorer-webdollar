@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { fetchChain, fetchLatestBlocks, type GenericRecord } from '../services/explorerApi'
 import { formatAddressDisplay } from '../utils/addressFormat'
+import { formatWebdAmount } from '../utils/webdAmount'
 
 const encodeParam = (value: string) => encodeURIComponent(value)
 
@@ -77,6 +78,7 @@ onUnmounted(() => {
             <th>Height</th>
             <th>Hash</th>
             <th>Miner</th>
+            <th>Total WEBD</th>
             <th>Tx</th>
           </tr>
         </thead>
@@ -103,6 +105,7 @@ onUnmounted(() => {
               </RouterLink>
               <span v-else>-</span>
             </td>
+            <td>{{ formatWebdAmount(block.totalWebd) }}</td>
             <td>{{ block.transactions ? (Array.isArray(block.transactions) ? block.transactions.length : '-') : '-' }}</td>
           </tr>
         </tbody>

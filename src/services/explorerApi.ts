@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { normalizeAddressForLookup } from '../utils/addressFormat'
+import { normalizeWebdAmount } from '../utils/webdAmount'
 
 const api = axios.create({
   baseURL: '/api',
@@ -34,6 +35,8 @@ type NormalizedBlock = GenericRecord & {
   timestamp: number | string
   minerAddress: string
   transactions: unknown[]
+  totalWebd: number
+  rewardWebd: number | null
 }
 
 type RecentBlocksCache = {
@@ -76,14 +79,30 @@ const toNumber = (value: unknown, fallback = 0): number => {
 }
 
 const normalizeBalanceLikePool = (value: unknown): number => {
-  if (value === null || value === undefined) return 0
-  const numeric = Number(String(value).replace(/,/g, '').trim())
-  if (!Number.isFinite(numeric)) return 0
-  if (numeric >= 10000) return numeric / 10000
-  return numeric
+  return normalizeWebdAmount(value) ?? 0
 }
 
 const toString = (value: unknown): string => (value === null || value === undefined ? '' : String(value))
+
+const sideEntries = (value: unknown): GenericRecord[] => {
+  if (Array.isArray(value)) return value.filter((item): item is GenericRecord => !!item && typeof item === 'object')
+  if (value && typeof value === 'object') {
+    const asRecord = value as GenericRecord
+    if (Array.isArray(asRecord.addresses)) {
+      return asRecord.addresses.filter((item): item is GenericRecord => !!item && typeof item === 'object')
+    }
+  }
+  return []
+}
+
+const amountFromTxRecord = (txData: GenericRecord): number => {
+  const toEntries = sideEntries(txData.to)
+  if (toEntries.length > 0) {
+    return toEntries.reduce((sum, entry) => sum + (normalizeWebdAmount(entry.amount) ?? 0), 0)
+  }
+
+  return normalizeWebdAmount(txData.amount) ?? 0
+}
 
 const extractBlockLayers = (payload: unknown): {
   raw: GenericRecord
@@ -108,12 +127,25 @@ const normalizeBlock = (payload: unknown): NormalizedBlock => {
     (raw.timeStamp as number | string | undefined) ??
     (raw.timestamp as number | string | undefined) ??
     '-'
-  const minerAddress = toString(level2.minerAddress ?? level1.minerAddress ?? raw.minerAddress)
+  const minerAddress = toString(
+    level2.minerAddress
+    ?? level1.minerAddress
+    ?? level2.posMinerAddress
+    ?? level1.posMinerAddress
+    ?? level2.resolvedBy
+    ?? level1.resolvedBy
+    ?? raw.minerAddress,
+  )
   const transactions = Array.isArray(level2.transactions)
     ? level2.transactions
     : Array.isArray(level1.transactions)
       ? level1.transactions
       : []
+  const totalWebd = transactions.reduce((sum, tx) => {
+    if (!tx || typeof tx !== 'object') return sum
+    return sum + amountFromTxRecord(tx as GenericRecord)
+  }, 0)
+  const rewardWebd = normalizeWebdAmount(level1.reward ?? raw.reward)
 
   return {
     ...raw,
@@ -123,6 +155,8 @@ const normalizeBlock = (payload: unknown): NormalizedBlock => {
     timestamp,
     minerAddress,
     transactions,
+    totalWebd,
+    rewardWebd,
   }
 }
 
@@ -152,9 +186,10 @@ const normalizeAddressTxItems = (items: GenericRecord[]): GenericRecord[] => {
       ? ((txData.to as GenericRecord).addresses as unknown[])
       : []
 
-    const inferredAmount = toAddresses.length > 0 && typeof toAddresses[0] === 'object'
-      ? toNumber((toAddresses[0] as GenericRecord).amount)
-      : 0
+    const inferredAmount = amountFromTxRecord({
+      to: toAddresses,
+      amount: txData.amount ?? item.amount,
+    })
 
     return {
       ...item,
@@ -188,7 +223,7 @@ const amountFromTxSideForAddress = (side: unknown, address: string): number => {
     if (!entry || typeof entry !== 'object') continue
     const data = entry as GenericRecord
     if (normalizeAddressForLookup(toString(data.address)).toLowerCase() !== lookupComparable) continue
-    total += toNumber(data.amount)
+    total += normalizeWebdAmount(data.amount) ?? 0
   }
   return total
 }
@@ -368,9 +403,7 @@ export async function fetchLatestTransactions(limit = 10): Promise<GenericRecord
       const txData = tx && typeof tx === 'object' ? (tx as GenericRecord) : {}
       const fromAddresses = addressFromTxSide(txData.from)
       const toAddresses = addressFromTxSide(txData.to)
-      const amount = toNumber((Array.isArray(txData.to) && txData.to.length > 0 && typeof txData.to[0] === 'object'
-        ? (txData.to[0] as GenericRecord).amount
-        : txData.amount) ?? 0)
+      const amount = amountFromTxRecord(txData)
 
       latest.push({
         txId,
@@ -475,7 +508,11 @@ export async function fetchTransaction(txId: string): Promise<GenericRecord> {
   const trimmed = txId.trim()
   try {
     const response = await api.get(`/tx/${encodeURIComponent(trimmed)}`)
-    return (response.data ?? {}) as GenericRecord
+    const raw = (response.data ?? {}) as GenericRecord
+    return {
+      ...raw,
+      amount: amountFromTxRecord(raw),
+    }
   } catch {
     const scanned = await getRecentBlocks(600)
     for (const block of scanned) {
