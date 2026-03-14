@@ -6,6 +6,10 @@ const api = axios.create({
   timeout: 15000,
 })
 
+const webApi = axios.create({
+  timeout: 15000,
+})
+
 export type ChainResponse = {
   syncing?: boolean
   transactionsCount?: number
@@ -69,6 +73,14 @@ const parseBlocksPayload = (payload: unknown): GenericRecord[] => {
 const toNumber = (value: unknown, fallback = 0): number => {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : fallback
+}
+
+const normalizeBalanceLikePool = (value: unknown): number => {
+  if (value === null || value === undefined) return 0
+  const numeric = Number(String(value).replace(/,/g, '').trim())
+  if (!Number.isFinite(numeric)) return 0
+  if (numeric >= 10000) return numeric / 10000
+  return numeric
 }
 
 const toString = (value: unknown): string => (value === null || value === undefined ? '' : String(value))
@@ -159,6 +171,44 @@ async function firstSuccessful<T>(requests: Array<() => Promise<T>>): Promise<T>
 async function fetchBlockRaw(param: string): Promise<GenericRecord> {
   const response = await api.get(`/block/${encodeURIComponent(param)}`)
   return (response.data ?? {}) as GenericRecord
+}
+
+async function fetchPoolMinersRaw(path: string): Promise<unknown[] | null> {
+  try {
+    const response = await webApi.get(path)
+    return Array.isArray(response.data) ? response.data : null
+  } catch {
+    return null
+  }
+}
+
+async function lookupPoolBalance(addressComparable: string): Promise<{ balance: number; source: string } | null> {
+  const sources: Array<{ name: string; path: string }> = [
+    { name: 'daniuda', path: '/pool-proxy/daniuda/miners' },
+    { name: 'spyclub', path: '/pool-proxy/spyclub/miners' },
+  ]
+
+  for (const source of sources) {
+    const miners = await fetchPoolMinersRaw(source.path)
+    if (!miners) continue
+
+    for (const miner of miners) {
+      if (!miner || typeof miner !== 'object') continue
+      const data = miner as GenericRecord
+      const minerAddress = toString(data.address ?? data.adress)
+      if (!minerAddress) continue
+
+      const minerComparable = normalizeAddressForLookup(minerAddress).toLowerCase()
+      if (minerComparable !== addressComparable) continue
+
+      return {
+        balance: normalizeBalanceLikePool(data.totalPOSBalance),
+        source: source.name,
+      }
+    }
+  }
+
+  return null
 }
 
 async function scanRecentBlocks(limit: number): Promise<NormalizedBlock[]> {
@@ -469,15 +519,18 @@ export async function fetchAddress(address: string): Promise<GenericRecord> {
       }
     }
 
+    const poolInfo = await lookupPoolBalance(lookupComparable)
+
     return {
       address: lookupAddress,
+      balance: poolInfo ? poolInfo.balance : undefined,
       minedBlocks,
       transactionsCount: txCount,
       totalIn,
       totalOut,
       netAmount: totalIn - totalOut,
       lastSeenHeight,
-      source: 'recent-block-scan',
+      source: poolInfo ? `recent-block-scan+pool-${poolInfo.source}` : 'recent-block-scan',
     }
   }
 }
