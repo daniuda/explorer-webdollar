@@ -136,7 +136,11 @@ watch(
           </tr>
           <tr>
             <th>Tx Count</th>
-            <td>{{ addressInfo.transactionsCount ?? transactions.length }}</td>
+            <td>{{ addressInfo.transactionsCount ?? addressInfo.txs ?? transactions.length }}</td>
+          </tr>
+          <tr>
+            <th>Source</th>
+            <td>{{ addressInfo.source ?? 'blockchain-db' }}</td>
           </tr>
         </tbody>
       </table>

@@ -133,6 +133,43 @@ const txIdFromUnknown = (tx: unknown): string => {
   return toString(data.txId ?? data.hash ?? data.id)
 }
 
+const firstAddressFromList = (value: unknown): string => {
+  if (!Array.isArray(value) || value.length === 0) return ''
+  const first = value[0]
+  if (!first || typeof first !== 'object') return ''
+  return toString((first as GenericRecord).address)
+}
+
+const normalizeAddressTxItems = (items: GenericRecord[]): GenericRecord[] => {
+  return items.map((item) => {
+    const txNested = item.tx && typeof item.tx === 'object' ? (item.tx as GenericRecord) : undefined
+    const txData = txNested?.data && typeof txNested.data === 'object' ? (txNested.data as GenericRecord) : {}
+
+    const fromAddresses = Array.isArray((txData.from as GenericRecord | undefined)?.addresses)
+      ? ((txData.from as GenericRecord).addresses as unknown[])
+      : []
+    const toAddresses = Array.isArray((txData.to as GenericRecord | undefined)?.addresses)
+      ? ((txData.to as GenericRecord).addresses as unknown[])
+      : []
+
+    const inferredAmount = toAddresses.length > 0 && typeof toAddresses[0] === 'object'
+      ? toNumber((toAddresses[0] as GenericRecord).amount)
+      : 0
+
+    return {
+      ...item,
+      txId: toString(item.txId || txNested?.txId || txNested?.hash),
+      blockHeight: toNumber(item.blockHeight ?? txNested?.blockHeight, 0),
+      timestamp: toNumber(txNested?.timestamp ?? item.timestamp ?? item.timeStamp, 0),
+      fromAddress: firstAddressFromList(fromAddresses),
+      toAddress: firstAddressFromList(toAddresses),
+      amount: inferredAmount,
+      from: fromAddresses,
+      to: toAddresses,
+    }
+  })
+}
+
 const addressFromTxSide = (side: unknown): string[] => {
   if (!Array.isArray(side)) return []
   return side
@@ -470,9 +507,26 @@ export async function fetchAddress(address: string): Promise<GenericRecord> {
   const trimmed = address.trim()
   const lookupAddress = normalizeAddressForLookup(trimmed)
   const lookupComparable = lookupAddress.toLowerCase()
+  const lookupCandidates = Array.from(new Set([trimmed, lookupAddress].map((it) => it.trim()).filter(Boolean)))
   try {
+    for (const candidate of lookupCandidates) {
+      try {
+        const response = await api.get('/address', { params: { address: candidate } })
+        const data = (response.data ?? {}) as GenericRecord
+        return {
+          ...data,
+          source: 'blockchain-db',
+        }
+      } catch {
+        // try next candidate
+      }
+    }
+
     const response = await api.get(`/address/${encodeURIComponent(lookupAddress)}`)
-    return (response.data ?? {}) as GenericRecord
+    return {
+      ...((response.data ?? {}) as GenericRecord),
+      source: 'blockchain-db',
+    }
   } catch {
     let scanned: NormalizedBlock[] = []
     try {
@@ -539,13 +593,23 @@ export async function fetchAddressTxs(address: string): Promise<GenericRecord[]>
   const trimmed = address.trim()
   const lookupAddress = normalizeAddressForLookup(trimmed)
   const lookupComparable = lookupAddress.toLowerCase()
+  const lookupCandidates = Array.from(new Set([trimmed, lookupAddress].map((it) => it.trim()).filter(Boolean)))
   try {
+    for (const candidate of lookupCandidates) {
+      try {
+        const response = await api.get('/address-txs', { params: { address: candidate } })
+        if (Array.isArray(response.data)) return normalizeAddressTxItems(response.data as GenericRecord[])
+      } catch {
+        // try next candidate
+      }
+    }
+
     const response = await api.get(`/address-txs/${encodeURIComponent(lookupAddress)}`)
-    if (Array.isArray(response.data)) return response.data as GenericRecord[]
+    if (Array.isArray(response.data)) return normalizeAddressTxItems(response.data as GenericRecord[])
 
     const data = response.data as Record<string, unknown>
-    if (Array.isArray(data?.transactions)) return safeArray(data.transactions)
-    if (Array.isArray(data?.txs)) return safeArray(data.txs)
+    if (Array.isArray(data?.transactions)) return normalizeAddressTxItems(safeArray(data.transactions))
+    if (Array.isArray(data?.txs)) return normalizeAddressTxItems(safeArray(data.txs))
 
     return []
   } catch {
