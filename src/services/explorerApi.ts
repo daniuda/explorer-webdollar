@@ -219,6 +219,43 @@ async function getRecentBlocks(limit: number): Promise<NormalizedBlock[]> {
   }
 }
 
+async function scanRecentBlocksByHeight(limit: number): Promise<NormalizedBlock[]> {
+  const chain = await fetchChain()
+  const tipHeight = toNumber((chain as ChainLike).height)
+  if (!Number.isFinite(tipHeight) || tipHeight < 0) return []
+
+  const blocks: NormalizedBlock[] = []
+  const batchSize = 25
+
+  for (let scanned = 0; scanned < limit; scanned += batchSize) {
+    const heights: number[] = []
+    for (let i = 0; i < batchSize; i += 1) {
+      const height = tipHeight - scanned - i
+      if (height < 0) break
+      heights.push(height)
+    }
+    if (heights.length === 0) break
+
+    const batch = await Promise.all(
+      heights.map(async (height) => {
+        try {
+          return normalizeBlock(await fetchBlockRaw(String(height)))
+        } catch {
+          return null
+        }
+      }),
+    )
+
+    for (const item of batch) {
+      if (item) blocks.push(item)
+    }
+
+    if (blocks.length >= limit) break
+  }
+
+  return blocks.slice(0, limit)
+}
+
 export async function fetchChain(): Promise<ChainResponse> {
   const response = await api.get('/chain')
   return response.data as ChainResponse
@@ -387,7 +424,21 @@ export async function fetchAddress(address: string): Promise<GenericRecord> {
     const response = await api.get(`/address/${encodeURIComponent(lookupAddress)}`)
     return (response.data ?? {}) as GenericRecord
   } catch {
-    const scanned = await getRecentBlocks(450)
+    let scanned: NormalizedBlock[] = []
+    try {
+      scanned = await getRecentBlocks(450)
+    } catch {
+      scanned = []
+    }
+
+    if (scanned.length === 0) {
+      try {
+        scanned = await scanRecentBlocksByHeight(500)
+      } catch {
+        scanned = []
+      }
+    }
+
     let minedBlocks = 0
     let txCount = 0
     let totalIn = 0
@@ -445,7 +496,21 @@ export async function fetchAddressTxs(address: string): Promise<GenericRecord[]>
 
     return []
   } catch {
-    const scanned = await getRecentBlocks(450)
+    let scanned: NormalizedBlock[] = []
+    try {
+      scanned = await getRecentBlocks(450)
+    } catch {
+      scanned = []
+    }
+
+    if (scanned.length === 0) {
+      try {
+        scanned = await scanRecentBlocksByHeight(500)
+      } catch {
+        scanned = []
+      }
+    }
+
     const results: GenericRecord[] = []
 
     for (const block of scanned) {
