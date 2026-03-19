@@ -8,16 +8,41 @@ import { formatWebdAmount } from '../utils/webdAmount'
 const loading = ref(false)
 const error = ref('')
 const wallets = ref<WalletEntry[]>([])
+const selectedTop = ref(50)
+const searchTerm = ref('')
 
 const encodeParam = (value: string) => encodeURIComponent(value)
+const TOP_OPTIONS = [10, 25, 50, 100]
 
-const topWallets = computed(() => wallets.value.slice(0, 100))
+const filteredWallets = computed(() => {
+  const needle = searchTerm.value.trim().toLowerCase()
+  if (!needle) return wallets.value
+
+  return wallets.value.filter((wallet) => {
+    const raw = wallet.address.toLowerCase()
+    const display = formatAddressDisplay(wallet.address).toLowerCase()
+    return raw.includes(needle) || display.includes(needle)
+  })
+})
+
+const totalFilteredBalance = computed(() => {
+  return filteredWallets.value.reduce((sum, wallet) => sum + wallet.balance, 0)
+})
+
+const topWallets = computed(() => filteredWallets.value.slice(0, selectedTop.value))
+
+const walletShare = (balance: number): string => {
+  const total = totalFilteredBalance.value
+  if (total <= 0) return '0.00%'
+  const pct = (balance / total) * 100
+  return `${pct.toFixed(2)}%`
+}
 
 const loadWallets = async () => {
   loading.value = true
   error.value = ''
   try {
-    wallets.value = await fetchTopWallets(100)
+    wallets.value = await fetchTopWallets(200)
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Cannot load wallets list.'
     wallets.value = []
@@ -44,6 +69,17 @@ onMounted(() => {
     <p v-if="error" class="error-banner">{{ error }}</p>
     <p v-if="loading">Loading wallets...</p>
 
+    <div class="search-row">
+      <input
+        v-model="searchTerm"
+        class="search-input"
+        placeholder="Cauta dupa adresa"
+      />
+      <select v-model.number="selectedTop" class="search-input" style="max-width: 140px">
+        <option v-for="option in TOP_OPTIONS" :key="option" :value="option">Top {{ option }}</option>
+      </select>
+    </div>
+
     <section class="panel">
       <h2>Top Wallets</h2>
       <p v-if="!loading && topWallets.length === 0">Nu exista date disponibile.</p>
@@ -53,6 +89,7 @@ onMounted(() => {
             <th>#</th>
             <th>Address</th>
             <th>Balance</th>
+            <th>% din total</th>
             <th>Source</th>
           </tr>
         </thead>
@@ -68,6 +105,7 @@ onMounted(() => {
               </RouterLink>
             </td>
             <td>{{ formatWebdAmount(wallet.balance, { minimumFractionDigits: 2, maximumFractionDigits: 4 }) }}</td>
+            <td>{{ walletShare(wallet.balance) }}</td>
             <td>{{ wallet.source }}</td>
           </tr>
         </tbody>
