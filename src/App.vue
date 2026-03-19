@@ -14,6 +14,7 @@
         <RouterLink to="/blocks" class="nav-link">Blocks</RouterLink>
         <RouterLink to="/transactions" class="nav-link">Transactions</RouterLink>
         <RouterLink to="/address" class="nav-link">Address</RouterLink>
+        <RouterLink to="/wallets" class="nav-link">Wallets</RouterLink>
         <RouterLink to="/pools" class="nav-link">Pools</RouterLink>
         <RouterLink to="/network" class="nav-link">Network</RouterLink>
       </nav>
