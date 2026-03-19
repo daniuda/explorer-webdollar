@@ -48,3 +48,11 @@
 
 ## Observatii
 - Valorile mici din Wallets au fost cauzate de normalizare dubla in UI; fixul este deja in `main`.
+
+## Update suplimentar (Timi pools)
+- Endpoint-urile corecte confirmate din `index.php`: `https://pool.timi.ro/pools/miners` si `https://pool.timi.ro/pools/stats`.
+- S-a corectat proxy-ul live Nginx pentru Timi (era setat gresit pe `node.timi.ro:8080`).
+- Validare live dupa fix:
+	- `https://webdollar.cloudns.nz/pool-proxy/timi/stats` -> JSON valid cu campuri `miners_online`, `blocks_confirmed_and_paid`, etc.
+	- `https://webdollar.cloudns.nz/pool-proxy/timi/miners` -> lista de mineri cu `totalPOSBalance`.
+- S-au mutat backup-urile `.bak*` din `sites-enabled` in afara configului activ pentru a elimina warning-urile de server-name duplicat.
