@@ -61,7 +61,7 @@ onMounted(() => {
     <header class="view-header">
       <div>
         <h1>Pools</h1>
-        <p>Pool stats + miners list (iudaWEBD, Spyclub).</p>
+        <p>Pool stats + miners list (iudaWEBD, Spyclub, Timi).</p>
       </div>
       <button class="ghost-btn" @click="refresh">Reload</button>
     </header>

@@ -40,6 +40,11 @@ export const POOLS: Array<{ name: string; miners: string; stats: string }> = [
     miners: '/pool-proxy/spyclub/miners',
     stats: '/pool-proxy/spyclub/stats',
   },
+  {
+    name: 'Timi',
+    miners: '/pool-proxy/timi/miners',
+    stats: '/pool-proxy/timi/stats',
+  },
 ]
 
 const VINDAX_TICKER_ENDPOINT = '/market-proxy/vindax/ticker/24hr'

@@ -258,6 +258,7 @@ async function lookupPoolBalance(addressComparable: string): Promise<{ balance: 
   const sources: Array<{ name: string; path: string }> = [
     { name: 'daniuda', path: '/pool-proxy/daniuda/miners' },
     { name: 'spyclub', path: '/pool-proxy/spyclub/miners' },
+    { name: 'timi', path: '/pool-proxy/timi/miners' },
   ]
 
   for (const source of sources) {
