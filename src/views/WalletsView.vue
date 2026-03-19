@@ -3,7 +3,6 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { fetchTopWallets, type WalletEntry } from '../services/walletsApi'
 import { formatAddressDisplay } from '../utils/addressFormat'
-import { formatWebdAmount } from '../utils/webdAmount'
 
 const loading = ref(false)
 const error = ref('')
@@ -36,6 +35,13 @@ const walletShare = (balance: number): string => {
   if (total <= 0) return '0.00%'
   const pct = (balance / total) * 100
   return `${pct.toFixed(2)}%`
+}
+
+const formatWalletBalance = (balance: number): string => {
+  return `${balance.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  })} WEBD`
 }
 
 const loadWallets = async () => {
@@ -108,7 +114,7 @@ watch(selectedTop, () => {
                 {{ formatAddressDisplay(wallet.address) }}
               </RouterLink>
             </td>
-            <td>{{ formatWebdAmount(wallet.balance, { minimumFractionDigits: 2, maximumFractionDigits: 4 }) }}</td>
+            <td>{{ formatWalletBalance(wallet.balance) }}</td>
             <td>{{ walletShare(wallet.balance) }}</td>
             <td>{{ wallet.source }}</td>
           </tr>
