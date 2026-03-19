@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { fetchTopWallets, type WalletEntry } from '../services/walletsApi'
 import { formatAddressDisplay } from '../utils/addressFormat'
@@ -29,7 +29,7 @@ const totalFilteredBalance = computed(() => {
   return filteredWallets.value.reduce((sum, wallet) => sum + wallet.balance, 0)
 })
 
-const topWallets = computed(() => filteredWallets.value.slice(0, selectedTop.value))
+const topWallets = computed(() => filteredWallets.value)
 
 const walletShare = (balance: number): string => {
   const total = totalFilteredBalance.value
@@ -42,7 +42,7 @@ const loadWallets = async () => {
   loading.value = true
   error.value = ''
   try {
-    wallets.value = await fetchTopWallets(200)
+    wallets.value = await fetchTopWallets(selectedTop.value)
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Cannot load wallets list.'
     wallets.value = []
@@ -52,6 +52,10 @@ const loadWallets = async () => {
 }
 
 onMounted(() => {
+  void loadWallets()
+})
+
+watch(selectedTop, () => {
   void loadWallets()
 })
 </script>

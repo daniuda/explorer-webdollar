@@ -1,7 +1,5 @@
 import axios from 'axios'
-import { normalizeAddressForLookup } from '../utils/addressFormat'
 import { normalizeWebdAmount } from '../utils/webdAmount'
-import { fetchPools } from './poolsApi'
 
 export type WalletEntry = {
   address: string
@@ -74,59 +72,9 @@ const sortAndLimit = (entries: WalletEntry[], limit: number): WalletEntry[] => {
     .slice(0, limit)
 }
 
-async function tryApiRichList(limit: number): Promise<WalletEntry[] | null> {
-  const probes: Array<{ path: string; params?: Record<string, unknown> }> = [
-    { path: '/wallets/top', params: { limit } },
-    { path: '/wallets', params: { sort: 'balance', order: 'desc', limit } },
-    { path: '/rich-list', params: { limit } },
-    { path: '/richlist', params: { limit } },
-    { path: '/addresses/top', params: { limit } },
-  ]
-
-  for (const probe of probes) {
-    try {
-      const response = await api.get(probe.path, probe.params ? { params: probe.params } : undefined)
-      const parsed = parseWalletEntries(response.data, `api:${probe.path}`)
-      if (parsed.length > 0) return sortAndLimit(parsed, limit)
-    } catch {
-      // Try next endpoint probe.
-    }
-  }
-
-  return null
-}
-
-async function fallbackFromPools(limit: number): Promise<WalletEntry[]> {
-  const pools = await fetchPools()
-  const balances = new Map<string, WalletEntry>()
-
-  for (const pool of pools) {
-    for (const miner of pool.miners) {
-      const normalizedAddress = normalizeAddressForLookup(miner.address)
-      const key = normalizedAddress.toLowerCase()
-      if (!key) continue
-
-      const existing = balances.get(key)
-      if (existing) {
-        existing.balance += miner.balance
-      } else {
-        balances.set(key, {
-          address: normalizedAddress,
-          balance: miner.balance,
-          source: 'pool-aggregate',
-        })
-      }
-    }
-  }
-
-  return sortAndLimit([...balances.values()], limit)
-}
-
 export async function fetchTopWallets(limit = 50): Promise<WalletEntry[]> {
   const normalizedLimit = Math.max(1, Math.min(limit, 500))
-
-  const apiRichList = await tryApiRichList(normalizedLimit)
-  if (apiRichList && apiRichList.length > 0) return apiRichList
-
-  return fallbackFromPools(normalizedLimit)
+  const response = await api.get('/wallets/top', { params: { limit: normalizedLimit } })
+  const parsed = parseWalletEntries(response.data, 'db:wallets-top')
+  return sortAndLimit(parsed, normalizedLimit)
 }
