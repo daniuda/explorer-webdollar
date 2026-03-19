@@ -174,6 +174,25 @@ const firstAddressFromList = (value: unknown): string => {
   return toString((first as GenericRecord).address)
 }
 
+const addressTxRecencyScore = (item: GenericRecord): { height: number; timestamp: number; id: string } => {
+  const txNested = item.tx && typeof item.tx === 'object' ? (item.tx as GenericRecord) : undefined
+  const height = toNumber(item.blockHeight ?? txNested?.blockHeight, 0)
+  const timestamp = toNumber(item.timestamp ?? item.timeStamp ?? txNested?.timestamp, 0)
+  const id = toString(item.txId ?? item.hash ?? item.id ?? txNested?.txId ?? txNested?.hash)
+  return { height, timestamp, id }
+}
+
+const sortAddressTransactionsByRecency = (items: GenericRecord[]): GenericRecord[] => {
+  return [...items].sort((a, b) => {
+    const scoreA = addressTxRecencyScore(a)
+    const scoreB = addressTxRecencyScore(b)
+
+    if (scoreA.height !== scoreB.height) return scoreB.height - scoreA.height
+    if (scoreA.timestamp !== scoreB.timestamp) return scoreB.timestamp - scoreA.timestamp
+    return scoreB.id.localeCompare(scoreA.id)
+  })
+}
+
 const normalizeAddressTxItems = (items: GenericRecord[]): GenericRecord[] => {
   return items.map((item) => {
     const txNested = item.tx && typeof item.tx === 'object' ? (item.tx as GenericRecord) : undefined
@@ -636,18 +655,26 @@ export async function fetchAddressTxs(address: string): Promise<GenericRecord[]>
     for (const candidate of lookupCandidates) {
       try {
         const response = await api.get('/address-txs', { params: { address: candidate } })
-        if (Array.isArray(response.data)) return normalizeAddressTxItems(response.data as GenericRecord[])
+        if (Array.isArray(response.data)) {
+          return sortAddressTransactionsByRecency(normalizeAddressTxItems(response.data as GenericRecord[]))
+        }
       } catch {
         // try next candidate
       }
     }
 
     const response = await api.get(`/address-txs/${encodeURIComponent(lookupAddress)}`)
-    if (Array.isArray(response.data)) return normalizeAddressTxItems(response.data as GenericRecord[])
+    if (Array.isArray(response.data)) {
+      return sortAddressTransactionsByRecency(normalizeAddressTxItems(response.data as GenericRecord[]))
+    }
 
     const data = response.data as Record<string, unknown>
-    if (Array.isArray(data?.transactions)) return normalizeAddressTxItems(safeArray(data.transactions))
-    if (Array.isArray(data?.txs)) return normalizeAddressTxItems(safeArray(data.txs))
+    if (Array.isArray(data?.transactions)) {
+      return sortAddressTransactionsByRecency(normalizeAddressTxItems(safeArray(data.transactions)))
+    }
+    if (Array.isArray(data?.txs)) {
+      return sortAddressTransactionsByRecency(normalizeAddressTxItems(safeArray(data.txs)))
+    }
 
     return []
   } catch {
@@ -696,6 +723,6 @@ export async function fetchAddressTxs(address: string): Promise<GenericRecord[]>
       }
     }
 
-    return results
+    return sortAddressTransactionsByRecency(results)
   }
 }

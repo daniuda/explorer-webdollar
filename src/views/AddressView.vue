@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fetchAddress, fetchAddressTxs, type GenericRecord } from '../services/explorerApi'
-import { formatAddressDisplay } from '../utils/addressFormat'
+import { formatAddressDisplay, normalizeAddressForLookup } from '../utils/addressFormat'
 import { formatWebdAmount } from '../utils/webdAmount'
 
 const address = ref('')
@@ -14,7 +14,19 @@ const route = useRoute()
 const router = useRouter()
 const encodeParam = (value: string) => encodeURIComponent(value)
 
-const latestTenTransactions = computed(() => transactions.value.slice(0, 10))
+const txAddresses = (tx: GenericRecord): string[] => {
+  const from = txFrom(tx)
+  const to = txTo(tx)
+  return [from, to].map((entry) => normalizeAddressForLookup(entry).toLowerCase()).filter(Boolean)
+}
+
+const latestTenTransactions = computed(() => {
+  const addressComparable = normalizeAddressForLookup(address.value).toLowerCase()
+  if (!addressComparable) return []
+
+  const filtered = transactions.value.filter((tx) => txAddresses(tx).includes(addressComparable))
+  return filtered.slice(0, 10)
+})
 
 const walletValue = computed(() => {
   const info = addressInfo.value ?? {}
@@ -63,15 +75,7 @@ const runSearch = async (rawAddress: string, updateRoute: boolean) => {
       fetchAddressTxs(trimmed),
     ])
     addressInfo.value = info
-    transactions.value = [...txs].sort((a, b) => {
-      const heightA = Number(a.blockHeight ?? 0)
-      const heightB = Number(b.blockHeight ?? 0)
-      if (heightA !== heightB) return heightB - heightA
-
-      const tsA = Number(a.timestamp ?? a.timeStamp ?? 0)
-      const tsB = Number(b.timestamp ?? b.timeStamp ?? 0)
-      return tsB - tsA
-    })
+    transactions.value = [...txs]
     const routeAddress = formatAddressDisplay(trimmed)
     address.value = routeAddress
     if (updateRoute) {
