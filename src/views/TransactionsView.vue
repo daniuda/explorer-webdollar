@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { fetchLatestTransactions, fetchTransaction, type GenericRecord } from '../services/explorerApi'
 import { formatAddressDisplay } from '../utils/addressFormat'
 import { formatWebdAmount } from '../utils/webdAmount'
+import { formatAbsoluteTime, formatTimeAgo } from '../utils/timeFormat'
 
 const txId = ref('')
 const loading = ref(false)
@@ -38,6 +39,7 @@ const toAddress = computed(() => {
 
 const amount = computed(() => formatWebdAmount((transaction.value ?? {}).amount))
 const hash = computed(() => String((transaction.value ?? {}).hash ?? (transaction.value ?? {}).txId ?? txId.value))
+const transactionTimestamp = computed(() => (transaction.value ?? {}).timestamp ?? (transaction.value ?? {}).timeStamp)
 
 const runSearch = async (rawTxId: string, updateRoute: boolean) => {
   const trimmed = rawTxId.trim()
@@ -136,6 +138,14 @@ watch(
             <th>Amount</th>
             <td>{{ amount }}</td>
           </tr>
+          <tr>
+            <th>When</th>
+            <td>{{ formatAbsoluteTime(transactionTimestamp) }}</td>
+          </tr>
+          <tr>
+            <th>Time Ago</th>
+            <td>{{ formatTimeAgo(transactionTimestamp) }}</td>
+          </tr>
         </tbody>
       </table>
 
@@ -157,6 +167,8 @@ watch(
             <th>To</th>
             <th>Amount</th>
             <th>Block</th>
+            <th>When</th>
+            <th>Time Ago</th>
           </tr>
         </thead>
         <tbody>
@@ -174,6 +186,8 @@ watch(
             </td>
             <td>{{ formatWebdAmount(tx.amount) }}</td>
             <td>{{ tx.blockHeight ?? '-' }}</td>
+            <td>{{ formatAbsoluteTime(tx.timestamp ?? tx.timeStamp) }}</td>
+            <td>{{ formatTimeAgo(tx.timestamp ?? tx.timeStamp) }}</td>
           </tr>
         </tbody>
       </table>

@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { fetchAddress, fetchAddressTxs, type GenericRecord } from '../services/explorerApi'
 import { formatAddressDisplay, normalizeAddressForLookup } from '../utils/addressFormat'
 import { formatWebdAmount } from '../utils/webdAmount'
+import { formatAbsoluteTime, formatTimeAgo } from '../utils/timeFormat'
 
 const address = ref('')
 const loading = ref(false)
@@ -166,6 +167,8 @@ watch(
             <th>From</th>
             <th>To</th>
             <th>Amount</th>
+            <th>When</th>
+            <th>Time Ago</th>
           </tr>
         </thead>
         <tbody>
@@ -201,6 +204,8 @@ watch(
               <span v-else>-</span>
             </td>
             <td>{{ formatWebdAmount(tx.amount) }}</td>
+            <td>{{ formatAbsoluteTime(tx.timestamp ?? tx.timeStamp) }}</td>
+            <td>{{ formatTimeAgo(tx.timestamp ?? tx.timeStamp) }}</td>
           </tr>
         </tbody>
       </table>
