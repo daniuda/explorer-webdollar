@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { fetchChain, fetchLatestBlocks, type GenericRecord } from '../services/explorerApi'
 import { formatAddressDisplay } from '../utils/addressFormat'
+import { formatTimeAgo } from '../utils/timeFormat'
 import { formatWebdAmount } from '../utils/webdAmount'
 
 const encodeParam = (value: string) => encodeURIComponent(value)
@@ -10,8 +11,16 @@ const loading = ref(true)
 const error = ref('')
 const chain = ref<Record<string, unknown>>({})
 const blocks = ref<GenericRecord[]>([])
+const nowTick = ref(Date.now())
 
 let intervalId: number | undefined
+let clockId: number | undefined
+
+const formatAgo = (value: unknown): string => {
+  // Keep this reactive so labels update continuously.
+  void nowTick.value
+  return formatTimeAgo(value)
+}
 
 const metrics = computed(() => {
   const height = Number(chain.value.height ?? 0)
@@ -42,10 +51,14 @@ const refresh = async () => {
 onMounted(async () => {
   await refresh()
   intervalId = window.setInterval(refresh, 10000)
+  clockId = window.setInterval(() => {
+    nowTick.value = Date.now()
+  }, 1000)
 })
 
 onUnmounted(() => {
   if (intervalId) window.clearInterval(intervalId)
+  if (clockId) window.clearInterval(clockId)
 })
 </script>
 
@@ -79,6 +92,7 @@ onUnmounted(() => {
             <th>Hash</th>
             <th>Miner</th>
             <th>Total WEBD</th>
+            <th>Timp trecut</th>
             <th>Tx</th>
           </tr>
         </thead>
@@ -106,6 +120,7 @@ onUnmounted(() => {
               <span v-else>-</span>
             </td>
             <td>{{ formatWebdAmount(block.totalWebd) }}</td>
+            <td>{{ formatAgo(block.timestamp ?? block.timeStamp) }}</td>
             <td>{{ block.transactions ? (Array.isArray(block.transactions) ? block.transactions.length : '-') : '-' }}</td>
           </tr>
         </tbody>
