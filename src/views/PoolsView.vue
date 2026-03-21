@@ -136,27 +136,28 @@ onMounted(() => {
       <section class="panel" style="margin-top: 1rem;">
         <h3>Last mined
           <span v-if="scanningLastMined" style="font-size:0.75rem;font-weight:400;color:#888;margin-left:0.5rem;">se caută...</span>
-          <span v-else-if="pool.lastMinedBlock?.stale" style="font-size:0.75rem;font-weight:400;color:#888;margin-left:0.5rem;">(negăsit în ultimele 200 blocuri – afișez ultimul cunoscut)</span>
+          <span v-else-if="pool.lastMinedBlock?.stale" style="font-size:0.75rem;font-weight:400;color:#888;margin-left:0.5rem;">(date cache; se caută sursă mai bună)</span>
+          <span v-else-if="!pool.lastMinedBlock" style="font-size:0.75rem;font-weight:400;color:#888;margin-left:0.5rem;">display soon...</span>
         </h3>
         <div class="pool-stats-grid">
           <div class="pool-stat-card">
             <p class="metric-label">Block</p>
             <p class="metric-value">
-              {{ pool.lastMinedBlock ? `#${pool.lastMinedBlock.height} (${shortHash(pool.lastMinedBlock.hash)})` : 'N/A' }}
+              {{ pool.lastMinedBlock ? `#${pool.lastMinedBlock.height} (${shortHash(pool.lastMinedBlock.hash)})` : 'display soon...' }}
             </p>
           </div>
           <div class="pool-stat-card">
             <p class="metric-label">Mined at</p>
-            <p class="metric-value">{{ pool.lastMinedBlock ? formatAbsoluteTime(pool.lastMinedBlock.timestamp) : 'N/A' }}</p>
+            <p class="metric-value">{{ pool.lastMinedBlock ? formatAbsoluteTime(pool.lastMinedBlock.timestamp) : 'display soon...' }}</p>
           </div>
           <div class="pool-stat-card">
             <p class="metric-label">Ago</p>
-            <p class="metric-value">{{ pool.lastMinedBlock ? formatTimeAgo(pool.lastMinedBlock.timestamp) : 'N/A' }}</p>
+            <p class="metric-value">{{ pool.lastMinedBlock ? formatTimeAgo(pool.lastMinedBlock.timestamp) : 'display soon...' }}</p>
           </div>
           <div class="pool-stat-card">
             <p class="metric-label">Reward</p>
             <p class="metric-value">
-              {{ pool.lastMinedBlock ? formatWebdAmount(pool.lastMinedBlock.rewardWebd, { minimumFractionDigits: 0, maximumFractionDigits: 4 }) : 'N/A' }}
+              {{ pool.lastMinedBlock ? formatWebdAmount(pool.lastMinedBlock.rewardWebd, { minimumFractionDigits: 0, maximumFractionDigits: 4 }) : 'display soon...' }}
             </p>
           </div>
         </div>
