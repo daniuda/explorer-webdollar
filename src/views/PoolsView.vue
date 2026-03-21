@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { fetchMarkets, fetchPools, findLastMinedBlocksForPools, type MarketSummary, type PoolSummary } from '../services/poolsApi'
 import { formatAddressDisplay } from '../utils/addressFormat'
@@ -10,6 +10,10 @@ const loading = ref(false)
 const scanningLastMined = ref(false)
 const error = ref('')
 const pools = ref<PoolSummary[]>([])
+const nowTick = ref(Date.now())
+const lastPaidMap = ref<Record<string, { blocksPaid: number; detectedAtMs: number }>>({})
+let autoRefreshTimer: ReturnType<typeof setInterval> | null = null
+let clockTimer: ReturnType<typeof setInterval> | null = null
 const markets = ref<MarketSummary>({
   webdUsdt: 0,
   webdVd: 0,
@@ -45,6 +49,63 @@ const conversionTimeLabel = computed(() => {
   return date.toLocaleString('ro-RO')
 })
 
+const LAST_PAID_CACHE_KEY = 'webdExplorer.poolLastPaidByBlocksPaid.v1'
+
+const loadLastPaidCache = (): Record<string, { blocksPaid: number; detectedAtMs: number }> => {
+  if (typeof window === 'undefined') return {}
+  try {
+    const raw = window.localStorage.getItem(LAST_PAID_CACHE_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as Record<string, { blocksPaid: number; detectedAtMs: number }>
+    if (!parsed || typeof parsed !== 'object') return {}
+    return parsed
+  } catch {
+    return {}
+  }
+}
+
+const saveLastPaidCache = (value: Record<string, { blocksPaid: number; detectedAtMs: number }>): void => {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(LAST_PAID_CACHE_KEY, JSON.stringify(value))
+  } catch {
+    // Ignore storage write issues.
+  }
+}
+
+const updateLastPaidByStats = (poolData: PoolSummary[]): void => {
+  const next = { ...lastPaidMap.value }
+  const now = Date.now()
+
+  for (const pool of poolData) {
+    const currentPaid = Number(pool.stats.blocksPaid || 0)
+    const prev = next[pool.name]
+
+    if (!prev) {
+      next[pool.name] = { blocksPaid: currentPaid, detectedAtMs: now }
+      continue
+    }
+
+    if (currentPaid > prev.blocksPaid || currentPaid < prev.blocksPaid) {
+      next[pool.name] = { blocksPaid: currentPaid, detectedAtMs: now }
+      continue
+    }
+
+    next[pool.name] = prev
+  }
+
+  lastPaidMap.value = next
+  saveLastPaidCache(next)
+}
+
+const estimatedLastPaidAgo = (poolName: string): string => {
+  // Depend on reactive clock so text updates live every second.
+  void nowTick.value
+  const state = lastPaidMap.value[poolName]
+  if (!state || !Number.isFinite(state.detectedAtMs) || state.detectedAtMs <= 0) return 'display soon...'
+  return formatTimeAgo(state.detectedAtMs)
+}
+
 const refresh = async () => {
   loading.value = true
   error.value = ''
@@ -52,6 +113,7 @@ const refresh = async () => {
     const [marketData, poolData] = await Promise.all([fetchMarkets(), fetchPools()])
     markets.value = marketData
     pools.value = poolData
+    updateLastPaidByStats(poolData)
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Cannot load pools data.'
   } finally {
@@ -76,7 +138,23 @@ const refresh = async () => {
 }
 
 onMounted(() => {
+  lastPaidMap.value = loadLastPaidCache()
   void refresh()
+
+  clockTimer = setInterval(() => {
+    nowTick.value = Date.now()
+  }, 1000)
+
+  autoRefreshTimer = setInterval(() => {
+    void refresh()
+  }, 30000)
+})
+
+onUnmounted(() => {
+  if (clockTimer) clearInterval(clockTimer)
+  if (autoRefreshTimer) clearInterval(autoRefreshTimer)
+  clockTimer = null
+  autoRefreshTimer = null
 })
 </script>
 
@@ -122,6 +200,10 @@ onMounted(() => {
         <div class="pool-stat-card">
           <p class="metric-label">Blocks Paid</p>
           <p class="metric-value">{{ pool.stats.blocksPaid }}</p>
+        </div>
+        <div class="pool-stat-card">
+          <p class="metric-label">Estimare ultimul block (după Blocks Paid)</p>
+          <p class="metric-value">{{ estimatedLastPaidAgo(pool.name) }}</p>
         </div>
         <div class="pool-stat-card">
           <p class="metric-label">Blocks Unpaid</p>
