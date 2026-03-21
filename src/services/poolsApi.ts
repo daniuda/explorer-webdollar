@@ -81,7 +81,7 @@ const balanceRegex = /"totalPOSBalance"\s*:\s*"?(\d+(?:\.\d+)?)"?/gi
 const http = axios.create({ timeout: 10000 })
 const apiHttp = axios.create({ baseURL: '/api', timeout: 15000 })
 const LAST_MINED_SCAN_LIMIT = 50
-const LAST_MINED_TIMEOUT_MS = 10000
+const LAST_MINED_TIMEOUT_MS = 5000
 const LAST_MINED_CACHE_KEY_PREFIX = 'webdExplorer.lastMined.v1.'
 
 const normalizeBalance = (value: unknown): number => {
@@ -334,11 +334,16 @@ const readLastMinedCache = (poolName: string): (PoolLastMinedBlock & { stale: tr
   if (!isBrowser) return null
   try {
     const raw = window.localStorage.getItem(LAST_MINED_CACHE_KEY_PREFIX + poolName)
-    if (!raw) return null
+    if (!raw) {
+      console.log(`[lastMined] cache miss for ${poolName}`)
+      return null
+    }
     const parsed = JSON.parse(raw) as PoolLastMinedBlock
     if (!parsed || typeof parsed !== 'object') return null
+    console.log(`[lastMined] cache hit for ${poolName}: block ${parsed.height}`)
     return { ...parsed, stale: true }
-  } catch {
+  } catch (e) {
+    console.log(`[lastMined] cache read error for ${poolName}: ${e}`)
     return null
   }
 }
