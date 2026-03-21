@@ -80,7 +80,6 @@ const balanceRegex = /"totalPOSBalance"\s*:\s*"?(\d+(?:\.\d+)?)"?/gi
 const http = axios.create({ timeout: 10000 })
 const apiHttp = axios.create({ baseURL: '/api', timeout: 15000 })
 const LAST_MINED_SCAN_LIMIT = 1000
-const LAST_MINED_BATCH_SIZE = 25
 
 const normalizeBalance = (value: unknown): number => {
   if (value === null || value === undefined) return 0
@@ -356,40 +355,29 @@ async function findLastMinedBlocksForPools(
   if (unresolved.size === 0) return result
 
   const chain = await safeApiGet<unknown>('/chain')
-  const tipHeight = toNumber((chain as Record<string, unknown> | null)?.height, -1)
-  if (tipHeight < 0) return result
+  let cursorHash = toString((chain as Record<string, unknown> | null)?.hash)
+  if (!cursorHash) return result
 
-  for (
-    let scanned = 0;
-    scanned < LAST_MINED_SCAN_LIMIT && unresolved.size > 0;
-    scanned += LAST_MINED_BATCH_SIZE
-  ) {
-    const heights: number[] = []
-    for (let i = 0; i < LAST_MINED_BATCH_SIZE; i += 1) {
-      const height = tipHeight - scanned - i
-      if (height < 0) break
-      heights.push(height)
-    }
-    if (heights.length === 0) break
+  const seen = new Set<string>()
 
-    const blocks = await Promise.all(
-      heights.map(async (height) => normalizeBlockSummary(await safeApiGet<unknown>(`/block/${height}`))),
-    )
+  for (let scanned = 0; scanned < LAST_MINED_SCAN_LIMIT && unresolved.size > 0; scanned += 1) {
+    if (!cursorHash || seen.has(cursorHash)) break
+    seen.add(cursorHash)
 
-    for (const block of blocks) {
-      if (!block) continue
-      const minerComparable = normalizeAddressForLookup(block.minerAddress).toLowerCase()
-      if (!minerComparable) continue
+    const block = normalizeBlockSummary(await safeApiGet<unknown>(`/block/${encodeURIComponent(cursorHash)}`))
+    if (!block) break
 
+    const minerComparable = normalizeAddressForLookup(block.minerAddress).toLowerCase()
+    if (minerComparable) {
       for (const poolName of Array.from(unresolved)) {
         const addresses = addressSets.get(poolName)
         if (!addresses || !addresses.has(minerComparable)) continue
         result[poolName] = block
         unresolved.delete(poolName)
       }
-
-      if (unresolved.size === 0) break
     }
+
+    cursorHash = block.hashPrev
   }
 
   return result
