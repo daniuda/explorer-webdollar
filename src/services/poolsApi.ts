@@ -22,6 +22,7 @@ export type PoolLastMinedBlock = {
   timestamp: number | string
   minerAddress: string
   rewardWebd: number | null
+  stale?: true
 }
 
 export type PoolSummary = {
@@ -79,7 +80,8 @@ const balanceRegex = /"totalPOSBalance"\s*:\s*"?(\d+(?:\.\d+)?)"?/gi
 
 const http = axios.create({ timeout: 10000 })
 const apiHttp = axios.create({ baseURL: '/api', timeout: 15000 })
-const LAST_MINED_SCAN_LIMIT = 1000
+const LAST_MINED_SCAN_LIMIT = 200
+const LAST_MINED_CACHE_KEY_PREFIX = 'webdExplorer.lastMined.v1.'
 
 const normalizeBalance = (value: unknown): number => {
   if (value === null || value === undefined) return 0
@@ -327,6 +329,29 @@ const normalizeBlockSummary = (payload: unknown): PoolLastMinedBlock | null => {
   }
 }
 
+const readLastMinedCache = (poolName: string): (PoolLastMinedBlock & { stale: true }) | null => {
+  if (!isBrowser) return null
+  try {
+    const raw = window.localStorage.getItem(LAST_MINED_CACHE_KEY_PREFIX + poolName)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as PoolLastMinedBlock
+    if (!parsed || typeof parsed !== 'object') return null
+    return { ...parsed, stale: true }
+  } catch {
+    return null
+  }
+}
+
+const writeLastMinedCache = (poolName: string, block: PoolLastMinedBlock): void => {
+  if (!isBrowser) return
+  try {
+    const { stale: _s, ...clean } = block as PoolLastMinedBlock & { stale?: true }
+    window.localStorage.setItem(LAST_MINED_CACHE_KEY_PREFIX + poolName, JSON.stringify(clean))
+  } catch {
+    // ignore
+  }
+}
+
 const poolAddressSet = (miners: PoolMiner[]): Set<string> => {
   const addresses = new Set<string>()
   for (const miner of miners) {
@@ -378,6 +403,18 @@ async function findLastMinedBlocksForPools(
     }
 
     cursorHash = block.hashPrev
+  }
+
+  // For pools not found in latest 200 blocks, fall back to localStorage cache.
+  for (const poolName of Array.from(unresolved)) {
+    const cached = readLastMinedCache(poolName)
+    if (cached) result[poolName] = cached
+  }
+
+  // Persist newly found blocks to cache.
+  for (const pool of pools) {
+    const found = result[pool.name]
+    if (found && !found.stale) writeLastMinedCache(pool.name, found)
   }
 
   return result

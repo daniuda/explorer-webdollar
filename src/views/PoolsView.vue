@@ -117,7 +117,9 @@ onMounted(() => {
       </div>
 
       <section class="panel" style="margin-top: 1rem;">
-        <h3>Last mined</h3>
+        <h3>Last mined
+          <span v-if="pool.lastMinedBlock?.stale" style="font-size:0.75rem;font-weight:400;color:#888;margin-left:0.5rem;">(negăsit în ultimele 200 blocuri – afișez ultimul cunoscut)</span>
+        </h3>
         <div class="pool-stats-grid">
           <div class="pool-stat-card">
             <p class="metric-label">Block</p>
