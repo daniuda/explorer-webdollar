@@ -1,9 +1,16 @@
+const WEBD_GENESIS_UNIX_SECONDS = 1524742312
+
 export function parseTimestampMs(value: unknown): number | null {
   if (value === null || value === undefined || value === '') return null
 
   if (typeof value === 'number' && Number.isFinite(value)) {
     if (value <= 0) return null
-    return value < 1_000_000_000_000 ? Math.trunc(value * 1000) : Math.trunc(value)
+    if (value < 1_000_000_000_000) {
+      const seconds = Math.trunc(value)
+      const normalizedSeconds = seconds < 1_000_000_000 ? seconds + WEBD_GENESIS_UNIX_SECONDS : seconds
+      return normalizedSeconds * 1000
+    }
+    return Math.trunc(value)
   }
 
   const raw = String(value).trim()
@@ -11,7 +18,12 @@ export function parseTimestampMs(value: unknown): number | null {
 
   const asNumber = Number(raw)
   if (Number.isFinite(asNumber) && asNumber > 0) {
-    return asNumber < 1_000_000_000_000 ? Math.trunc(asNumber * 1000) : Math.trunc(asNumber)
+    if (asNumber < 1_000_000_000_000) {
+      const seconds = Math.trunc(asNumber)
+      const normalizedSeconds = seconds < 1_000_000_000 ? seconds + WEBD_GENESIS_UNIX_SECONDS : seconds
+      return normalizedSeconds * 1000
+    }
+    return Math.trunc(asNumber)
   }
 
   const parsed = Date.parse(raw)
