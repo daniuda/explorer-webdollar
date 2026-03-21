@@ -83,19 +83,40 @@ export function toHexAddressFromWebdWallet(value: string): string | null {
 
   try {
     const bytes = decodeWebdBase64(raw)
-    if (bytes.length !== ADDRESS_WIF_TOTAL_LENGTH) return null
+    // Accept both wrapped (30 bytes) and unwrapped (26 bytes) formats.
+    const isWrapped = bytes.length === ADDRESS_WIF_TOTAL_LENGTH
+    const isUnwrapped = bytes.length === 26
 
-    if (!PREFIX_BYTES.every((byte, index) => bytes[index] === byte)) return null
-    if (bytes[bytes.length - 1] !== SUFFIX_BYTE) return null
+    if (!isWrapped && !isUnwrapped) return null
 
-    const addressWithVersion = bytes.slice(4, 25)
-    if (addressWithVersion[0] !== VERSION_BYTE) return null
+    if (isWrapped) {
+      if (!PREFIX_BYTES.every((byte, index) => bytes[index] === byte)) return null
+      if (bytes[bytes.length - 1] !== SUFFIX_BYTE) return null
 
-    const checksum = bytes.slice(25, 29)
-    const expectedChecksum = sha256(sha256(addressWithVersion)).slice(0, 4)
-    if (!equalBytes(checksum, expectedChecksum)) return null
+      const addressWithVersion = bytes.slice(4, 25)
+      if (addressWithVersion[0] !== VERSION_BYTE) return null
 
-    return bytesToHex(addressWithVersion.slice(1))
+      const checksum = bytes.slice(25, 29)
+      const expectedChecksum = sha256(sha256(addressWithVersion)).slice(0, 4)
+      if (!equalBytes(checksum, expectedChecksum)) return null
+
+      return bytesToHex(addressWithVersion.slice(1))
+    }
+
+    // Unwrapped format (26 bytes): version(1) + address(20) + checksum(4) + suffix(1)
+    if (isUnwrapped) {
+      if (bytes[0] !== VERSION_BYTE) return null
+      if (bytes[bytes.length - 1] !== SUFFIX_BYTE) return null
+
+      const addressWithVersion = bytes.slice(0, 21)
+      const checksum = bytes.slice(21, 25)
+      const expectedChecksum = sha256(sha256(addressWithVersion)).slice(0, 4)
+      if (!equalBytes(checksum, expectedChecksum)) return null
+
+      return bytesToHex(addressWithVersion.slice(1))
+    }
+
+    return null
   } catch {
     return null
   }

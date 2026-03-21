@@ -63,9 +63,10 @@ const refresh = async () => {
     const lastMinedMap = await findLastMinedBlocksForPools(
       pools.value.map((p) => ({ name: p.name, miners: p.miners })),
     )
+    // Only update pools that have newly found data (don't lose cache on timeout)
     pools.value = pools.value.map((pool) => ({
       ...pool,
-      lastMinedBlock: lastMinedMap[pool.name] ?? pool.lastMinedBlock ?? null,
+      lastMinedBlock: lastMinedMap[pool.name] !== undefined ? lastMinedMap[pool.name] : pool.lastMinedBlock,
     }))
   } catch {
     // Silently ignore scan errors; cached values remain.

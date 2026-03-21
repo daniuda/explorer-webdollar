@@ -80,7 +80,8 @@ const balanceRegex = /"totalPOSBalance"\s*:\s*"?(\d+(?:\.\d+)?)"?/gi
 
 const http = axios.create({ timeout: 10000 })
 const apiHttp = axios.create({ baseURL: '/api', timeout: 15000 })
-const LAST_MINED_SCAN_LIMIT = 200
+const LAST_MINED_SCAN_LIMIT = 50
+const LAST_MINED_TIMEOUT_MS = 10000
 const LAST_MINED_CACHE_KEY_PREFIX = 'webdExplorer.lastMined.v1.'
 
 const normalizeBalance = (value: unknown): number => {
@@ -362,6 +363,19 @@ const poolAddressSet = (miners: PoolMiner[]): Set<string> => {
 }
 
 export async function findLastMinedBlocksForPools(
+  pools: Array<{ name: string; miners: PoolMiner[] }>,
+): Promise<Record<string, PoolLastMinedBlock | null>> {
+  return Promise.race([
+    findLastMinedBlocksForPoolsInternal(pools),
+    new Promise<Record<string, PoolLastMinedBlock | null>>((resolve) => {
+      setTimeout(() => {
+        resolve({}) // Return empty on timeout, will use cache
+      }, LAST_MINED_TIMEOUT_MS)
+    }),
+  ])
+}
+
+async function findLastMinedBlocksForPoolsInternal(
   pools: Array<{ name: string; miners: PoolMiner[] }>,
 ): Promise<Record<string, PoolLastMinedBlock | null>> {
   const result: Record<string, PoolLastMinedBlock | null> = {}
