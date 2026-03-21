@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { fetchMarkets, fetchPools, type MarketSummary, type PoolSummary } from '../services/poolsApi'
+import { fetchMarkets, fetchPools, findLastMinedBlocksForPools, type MarketSummary, type PoolSummary } from '../services/poolsApi'
 import { formatAddressDisplay } from '../utils/addressFormat'
 import { formatAbsoluteTime, formatTimeAgo } from '../utils/timeFormat'
 import { formatWebdAmount } from '../utils/webdAmount'
 
 const loading = ref(false)
+const scanningLastMined = ref(false)
 const error = ref('')
 const pools = ref<PoolSummary[]>([])
 const markets = ref<MarketSummary>({
@@ -55,6 +56,21 @@ const refresh = async () => {
     error.value = err instanceof Error ? err.message : 'Cannot load pools data.'
   } finally {
     loading.value = false
+  }
+  // Scan for last mined blocks in background after pools are already visible.
+  scanningLastMined.value = true
+  try {
+    const lastMinedMap = await findLastMinedBlocksForPools(
+      pools.value.map((p) => ({ name: p.name, miners: p.miners })),
+    )
+    pools.value = pools.value.map((pool) => ({
+      ...pool,
+      lastMinedBlock: lastMinedMap[pool.name] ?? pool.lastMinedBlock ?? null,
+    }))
+  } catch {
+    // Silently ignore scan errors; cached values remain.
+  } finally {
+    scanningLastMined.value = false
   }
 }
 
@@ -118,7 +134,8 @@ onMounted(() => {
 
       <section class="panel" style="margin-top: 1rem;">
         <h3>Last mined
-          <span v-if="pool.lastMinedBlock?.stale" style="font-size:0.75rem;font-weight:400;color:#888;margin-left:0.5rem;">(negăsit în ultimele 200 blocuri – afișez ultimul cunoscut)</span>
+          <span v-if="scanningLastMined" style="font-size:0.75rem;font-weight:400;color:#888;margin-left:0.5rem;">se caută...</span>
+          <span v-else-if="pool.lastMinedBlock?.stale" style="font-size:0.75rem;font-weight:400;color:#888;margin-left:0.5rem;">(negăsit în ultimele 200 blocuri – afișez ultimul cunoscut)</span>
         </h3>
         <div class="pool-stats-grid">
           <div class="pool-stat-card">

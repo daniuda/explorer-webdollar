@@ -361,7 +361,7 @@ const poolAddressSet = (miners: PoolMiner[]): Set<string> => {
   return addresses
 }
 
-async function findLastMinedBlocksForPools(
+export async function findLastMinedBlocksForPools(
   pools: Array<{ name: string; miners: PoolMiner[] }>,
 ): Promise<Record<string, PoolLastMinedBlock | null>> {
   const result: Record<string, PoolLastMinedBlock | null> = {}
@@ -457,30 +457,22 @@ export async function fetchMarkets(): Promise<MarketSummary> {
 }
 
 export async function fetchPools(): Promise<PoolSummary[]> {
-  const baseSummaries = await Promise.all(
+  const summaries = await Promise.all(
     POOLS.map(async (pool) => {
       const [minersRaw, statsRaw] = await Promise.all([safeGet(pool.miners), safeGet(pool.stats)])
       const miners = parsePoolMiners(minersRaw)
       const stats = parsePoolStats(statsRaw)
       const totalPosWebd = miners.reduce((sum, miner) => sum + miner.balance, 0)
-
+      // Return cached last mined block immediately (no live scan here).
+      const lastMinedBlock = readLastMinedCache(pool.name)
       return {
         name: pool.name,
         miners,
         stats,
         totalPosWebd,
+        lastMinedBlock,
       }
     }),
   )
-
-  const lastMinedMap = await findLastMinedBlocksForPools(
-    baseSummaries.map((pool) => ({ name: pool.name, miners: pool.miners })),
-  )
-
-  const summaries: PoolSummary[] = baseSummaries.map((pool) => ({
-    ...pool,
-    lastMinedBlock: lastMinedMap[pool.name] ?? null,
-  }))
-
   return summaries
 }
