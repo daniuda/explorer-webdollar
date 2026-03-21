@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fetchBlockByParam, fetchLatestBlocks, type GenericRecord } from '../services/explorerApi'
 import { formatAddressDisplay } from '../utils/addressFormat'
+import { formatTimeAgo } from '../utils/timeFormat'
 import { formatWebdAmount } from '../utils/webdAmount'
 
 const loading = ref(false)
@@ -10,9 +11,17 @@ const error = ref('')
 const query = ref('')
 const latest = ref<GenericRecord[]>([])
 const selected = ref<GenericRecord | null>(null)
+const nowTick = ref(Date.now())
+let clockTimer: ReturnType<typeof setInterval> | null = null
 const route = useRoute()
 const router = useRouter()
 const encodeParam = (value: string) => encodeURIComponent(value)
+
+const formatAgo = (value: unknown): string => {
+  // Depend on clock to update elapsed labels in real-time.
+  void nowTick.value
+  return formatTimeAgo(value)
+}
 
 const txIdFromEntry = (tx: unknown): string => {
   if (typeof tx === 'string') return tx
@@ -111,8 +120,17 @@ const hydrateFromRoute = async () => {
 }
 
 onMounted(async () => {
+  clockTimer = setInterval(() => {
+    nowTick.value = Date.now()
+  }, 1000)
+
   await loadLatest()
   await hydrateFromRoute()
+})
+
+onUnmounted(() => {
+  if (clockTimer) clearInterval(clockTimer)
+  clockTimer = null
 })
 
 watch(
@@ -198,8 +216,8 @@ watch(
             <td>{{ selectedNonce }}</td>
           </tr>
           <tr>
-            <th>Timestamp</th>
-            <td>{{ selected.timestamp ?? selected.timeStamp ?? '-' }}</td>
+            <th>Timp trecut</th>
+            <td>{{ formatAgo(selected.timestamp ?? selected.timeStamp) }}</td>
           </tr>
           <tr>
             <th>Difficulty</th>
@@ -261,7 +279,7 @@ watch(
             <th>Hash</th>
             <th>Miner</th>
             <th>Total WEBD</th>
-            <th>Timestamp</th>
+            <th>Timp trecut</th>
           </tr>
         </thead>
         <tbody>
@@ -288,7 +306,7 @@ watch(
               <span v-else>-</span>
             </td>
             <td>{{ formatBlockAmount(block.totalWebd) }}</td>
-            <td>{{ block.timestamp ?? block.timeStamp ?? '-' }}</td>
+            <td>{{ formatAgo(block.timestamp ?? block.timeStamp) }}</td>
           </tr>
         </tbody>
       </table>
