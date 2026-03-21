@@ -80,8 +80,8 @@ const balanceRegex = /"totalPOSBalance"\s*:\s*"?(\d+(?:\.\d+)?)"?/gi
 
 const http = axios.create({ timeout: 10000 })
 const apiHttp = axios.create({ baseURL: '/api', timeout: 15000 })
-const LAST_MINED_SCAN_LIMIT = 50
-const LAST_MINED_TIMEOUT_MS = 5000
+const LAST_MINED_SCAN_LIMIT = 200
+const LAST_MINED_TIMEOUT_MS = 8000
 const LAST_MINED_CACHE_KEY_PREFIX = 'webdExplorer.lastMined.v1.'
 
 const normalizeBalance = (value: unknown): number => {

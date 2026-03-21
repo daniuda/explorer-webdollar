@@ -104,8 +104,8 @@ export function toHexAddressFromWebdWallet(value: string): string | null {
     }
 
     // Unwrapped format (26 bytes): version(1) + address(20) + checksum(4) + suffix(1)
+    // Accept any version byte for unwrapped format (pool addresses use 0x80, not 0x00)
     if (isUnwrapped) {
-      if (bytes[0] !== VERSION_BYTE) return null
       if (bytes[bytes.length - 1] !== SUFFIX_BYTE) return null
 
       const addressWithVersion = bytes.slice(0, 21)
