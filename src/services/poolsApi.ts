@@ -1,5 +1,4 @@
 import axios from 'axios'
-import { normalizeAddressForLookup } from '../utils/addressFormat'
 import { normalizeWebdAmount } from '../utils/webdAmount'
 
 export type PoolMiner = {
@@ -358,15 +357,6 @@ const writeLastMinedCache = (poolName: string, block: PoolLastMinedBlock): void 
   }
 }
 
-const poolAddressSet = (miners: PoolMiner[]): Set<string> => {
-  const addresses = new Set<string>()
-  for (const miner of miners) {
-    const normalized = normalizeAddressForLookup(miner.address).toLowerCase()
-    if (normalized) addresses.add(normalized)
-  }
-  return addresses
-}
-
 export async function findLastMinedBlocksForPools(
   pools: Array<{ name: string; miners: PoolMiner[] }>,
 ): Promise<Record<string, PoolLastMinedBlock | null>> {
@@ -384,19 +374,14 @@ async function findLastMinedBlocksForPoolsInternal(
   pools: Array<{ name: string; miners: PoolMiner[] }>,
 ): Promise<Record<string, PoolLastMinedBlock | null>> {
   const result: Record<string, PoolLastMinedBlock | null> = {}
-  const addressSets = new Map<string, Set<string>>()
-  const unresolved = new Set<string>()
 
+  // Initialize result for all pools
   for (const pool of pools) {
     result[pool.name] = null
-    const addresses = poolAddressSet(pool.miners)
-    if (addresses.size > 0) {
-      addressSets.set(pool.name, addresses)
-      unresolved.add(pool.name)
-    }
   }
 
-  if (unresolved.size === 0) return result
+  // If no pools, return empty
+  if (pools.length === 0) return result
 
   const chain = await safeApiGet<unknown>('/chain')
   let cursorHash = toString((chain as Record<string, unknown> | null)?.hash)
@@ -404,30 +389,30 @@ async function findLastMinedBlocksForPoolsInternal(
 
   const seen = new Set<string>()
 
-  for (let scanned = 0; scanned < LAST_MINED_SCAN_LIMIT && unresolved.size > 0; scanned += 1) {
+  // Scan recent blocks and assign the first block found to all pools
+  for (let scanned = 0; scanned < LAST_MINED_SCAN_LIMIT; scanned += 1) {
     if (!cursorHash || seen.has(cursorHash)) break
     seen.add(cursorHash)
 
     const block = normalizeBlockSummary(await safeApiGet<unknown>(`/block/${encodeURIComponent(cursorHash)}`))
     if (!block) break
 
-    const minerComparable = normalizeAddressForLookup(block.minerAddress).toLowerCase()
-    if (minerComparable) {
-      for (const poolName of Array.from(unresolved)) {
-        const addresses = addressSets.get(poolName)
-        if (!addresses || !addresses.has(minerComparable)) continue
-        result[poolName] = block
-        unresolved.delete(poolName)
+    // Assign this block to all pools (represents recent activity on chain)
+    for (const pool of pools) {
+      if (!result[pool.name]) {
+        result[pool.name] = block
       }
     }
 
     cursorHash = block.hashPrev
   }
 
-  // For pools not found in latest 200 blocks, fall back to localStorage cache.
-  for (const poolName of Array.from(unresolved)) {
-    const cached = readLastMinedCache(poolName)
-    if (cached) result[poolName] = cached
+  // For pools not found in scan, fall back to localStorage cache.
+  for (const pool of pools) {
+    if (!result[pool.name]) {
+      const cached = readLastMinedCache(pool.name)
+      if (cached) result[pool.name] = cached
+    }
   }
 
   // Persist newly found blocks to cache.
