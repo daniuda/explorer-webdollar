@@ -1,4 +1,6 @@
 import axios from 'axios'
+import { normalizeAddressForLookup } from '../utils/addressFormat'
+import { normalizeWebdAmount } from '../utils/webdAmount'
 
 export type PoolMiner = {
   address: string
@@ -13,11 +15,21 @@ export type PoolStats = {
   blocksBeingConfirmed: number
 }
 
+export type PoolLastMinedBlock = {
+  hash: string
+  hashPrev: string
+  height: number
+  timestamp: number | string
+  minerAddress: string
+  rewardWebd: number | null
+}
+
 export type PoolSummary = {
   name: string
   miners: PoolMiner[]
   stats: PoolStats
   totalPosWebd: number
+  lastMinedBlock?: PoolLastMinedBlock | null
 }
 
 export type MarketSummary = {
@@ -66,6 +78,9 @@ const addressRegex = /"(?:address|adress)"\s*:\s*"([^"]+)"/gi
 const balanceRegex = /"totalPOSBalance"\s*:\s*"?(\d+(?:\.\d+)?)"?/gi
 
 const http = axios.create({ timeout: 10000 })
+const apiHttp = axios.create({ baseURL: '/api', timeout: 15000 })
+const LAST_MINED_SCAN_LIMIT = 1000
+const LAST_MINED_BATCH_SIZE = 25
 
 const normalizeBalance = (value: unknown): number => {
   if (value === null || value === undefined) return 0
@@ -74,6 +89,13 @@ const normalizeBalance = (value: unknown): number => {
   if (numeric >= 10000) return numeric / 10000
   return numeric
 }
+
+const toNumber = (value: unknown, fallback = 0): number => {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : fallback
+}
+
+const toString = (value: unknown): string => (value === null || value === undefined ? '' : String(value))
 
 const parseVindaxLast = (payload: unknown): number => {
   if (!payload || typeof payload !== 'object') return 0
@@ -244,6 +266,15 @@ async function safeGet<T = unknown>(url: string): Promise<T | null> {
   }
 }
 
+async function safeApiGet<T = unknown>(path: string): Promise<T | null> {
+  try {
+    const response = await apiHttp.get(path)
+    return response.data as T
+  } catch {
+    return null
+  }
+}
+
 async function safeGetWithParams<T = unknown>(url: string, params: Record<string, unknown>): Promise<T | null> {
   try {
     const response = await http.get(url, { params })
@@ -256,6 +287,112 @@ async function safeGetWithParams<T = unknown>(url: string, params: Record<string
 async function fetchVindaxLastPrice(symbol: string): Promise<number> {
   const raw = await safeGetWithParams(VINDAX_TICKER_ENDPOINT, { symbol })
   return parseVindaxLast(raw)
+}
+
+const normalizeBlockSummary = (payload: unknown): PoolLastMinedBlock | null => {
+  if (!payload || typeof payload !== 'object') return null
+
+  const raw = payload as Record<string, unknown>
+  const level1 = (raw.data && typeof raw.data === 'object' ? raw.data : raw) as Record<string, unknown>
+  const level2 = (level1.data && typeof level1.data === 'object' ? level1.data : level1) as Record<string, unknown>
+
+  const hash = toString(level1.hash ?? raw.hash)
+  const hashPrev = toString(level1.hashPrev ?? raw.hashPrev)
+  const height = toNumber(level1.height ?? raw.height)
+  const timestamp =
+    (level1.timeStamp as number | string | undefined)
+    ?? (level1.timestamp as number | string | undefined)
+    ?? (raw.timeStamp as number | string | undefined)
+    ?? (raw.timestamp as number | string | undefined)
+    ?? '-'
+
+  const minerAddress = toString(
+    level2.minerAddress
+    ?? level1.minerAddress
+    ?? level2.posMinerAddress
+    ?? level1.posMinerAddress
+    ?? level2.resolvedBy
+    ?? level1.resolvedBy
+    ?? raw.minerAddress,
+  )
+
+  if (!hash && height <= 0) return null
+
+  return {
+    hash,
+    hashPrev,
+    height,
+    timestamp,
+    minerAddress,
+    rewardWebd: normalizeWebdAmount(level1.reward ?? raw.reward),
+  }
+}
+
+const poolAddressSet = (miners: PoolMiner[]): Set<string> => {
+  const addresses = new Set<string>()
+  for (const miner of miners) {
+    const normalized = normalizeAddressForLookup(miner.address).toLowerCase()
+    if (normalized) addresses.add(normalized)
+  }
+  return addresses
+}
+
+async function findLastMinedBlocksForPools(
+  pools: Array<{ name: string; miners: PoolMiner[] }>,
+): Promise<Record<string, PoolLastMinedBlock | null>> {
+  const result: Record<string, PoolLastMinedBlock | null> = {}
+  const addressSets = new Map<string, Set<string>>()
+  const unresolved = new Set<string>()
+
+  for (const pool of pools) {
+    result[pool.name] = null
+    const addresses = poolAddressSet(pool.miners)
+    if (addresses.size > 0) {
+      addressSets.set(pool.name, addresses)
+      unresolved.add(pool.name)
+    }
+  }
+
+  if (unresolved.size === 0) return result
+
+  const chain = await safeApiGet<unknown>('/chain')
+  const tipHeight = toNumber((chain as Record<string, unknown> | null)?.height, -1)
+  if (tipHeight < 0) return result
+
+  for (
+    let scanned = 0;
+    scanned < LAST_MINED_SCAN_LIMIT && unresolved.size > 0;
+    scanned += LAST_MINED_BATCH_SIZE
+  ) {
+    const heights: number[] = []
+    for (let i = 0; i < LAST_MINED_BATCH_SIZE; i += 1) {
+      const height = tipHeight - scanned - i
+      if (height < 0) break
+      heights.push(height)
+    }
+    if (heights.length === 0) break
+
+    const blocks = await Promise.all(
+      heights.map(async (height) => normalizeBlockSummary(await safeApiGet<unknown>(`/block/${height}`))),
+    )
+
+    for (const block of blocks) {
+      if (!block) continue
+      const minerComparable = normalizeAddressForLookup(block.minerAddress).toLowerCase()
+      if (!minerComparable) continue
+
+      for (const poolName of Array.from(unresolved)) {
+        const addresses = addressSets.get(poolName)
+        if (!addresses || !addresses.has(minerComparable)) continue
+        result[poolName] = block
+        unresolved.delete(poolName)
+      }
+
+      if (unresolved.size === 0) break
+    }
+  }
+
+  return result
 }
 
 async function getDailyVdUsdtRate(): Promise<DailyVdUsdtCache> {
@@ -295,7 +432,7 @@ export async function fetchMarkets(): Promise<MarketSummary> {
 }
 
 export async function fetchPools(): Promise<PoolSummary[]> {
-  const summaries = await Promise.all(
+  const baseSummaries = await Promise.all(
     POOLS.map(async (pool) => {
       const [minersRaw, statsRaw] = await Promise.all([safeGet(pool.miners), safeGet(pool.stats)])
       const miners = parsePoolMiners(minersRaw)
@@ -310,6 +447,15 @@ export async function fetchPools(): Promise<PoolSummary[]> {
       }
     }),
   )
+
+  const lastMinedMap = await findLastMinedBlocksForPools(
+    baseSummaries.map((pool) => ({ name: pool.name, miners: pool.miners })),
+  )
+
+  const summaries: PoolSummary[] = baseSummaries.map((pool) => ({
+    ...pool,
+    lastMinedBlock: lastMinedMap[pool.name] ?? null,
+  }))
 
   return summaries
 }

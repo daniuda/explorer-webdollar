@@ -3,6 +3,8 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { fetchMarkets, fetchPools, type MarketSummary, type PoolSummary } from '../services/poolsApi'
 import { formatAddressDisplay } from '../utils/addressFormat'
+import { formatAbsoluteTime, formatTimeAgo } from '../utils/timeFormat'
+import { formatWebdAmount } from '../utils/webdAmount'
 
 const loading = ref(false)
 const error = ref('')
@@ -16,6 +18,11 @@ const markets = ref<MarketSummary>({
   usdComputedAt: '',
 })
 const encodeParam = (value: string) => encodeURIComponent(value)
+const shortHash = (value: string): string => {
+  const trimmed = value.trim()
+  if (trimmed.length <= 14) return trimmed || '-'
+  return `${trimmed.slice(0, 8)}...${trimmed.slice(-6)}`
+}
 
 const formatNumber = (value: number, decimals = 2): string =>
   value.toLocaleString('en-US', {
@@ -108,6 +115,32 @@ onMounted(() => {
           <p class="metric-value">{{ pool.stats.blocksBeingConfirmed }}</p>
         </div>
       </div>
+
+      <section class="panel" style="margin-top: 1rem;">
+        <h3>Last mined</h3>
+        <div class="pool-stats-grid">
+          <div class="pool-stat-card">
+            <p class="metric-label">Block</p>
+            <p class="metric-value">
+              {{ pool.lastMinedBlock ? `#${pool.lastMinedBlock.height} (${shortHash(pool.lastMinedBlock.hash)})` : 'N/A' }}
+            </p>
+          </div>
+          <div class="pool-stat-card">
+            <p class="metric-label">Mined at</p>
+            <p class="metric-value">{{ pool.lastMinedBlock ? formatAbsoluteTime(pool.lastMinedBlock.timestamp) : 'N/A' }}</p>
+          </div>
+          <div class="pool-stat-card">
+            <p class="metric-label">Ago</p>
+            <p class="metric-value">{{ pool.lastMinedBlock ? formatTimeAgo(pool.lastMinedBlock.timestamp) : 'N/A' }}</p>
+          </div>
+          <div class="pool-stat-card">
+            <p class="metric-label">Reward</p>
+            <p class="metric-value">
+              {{ pool.lastMinedBlock ? formatWebdAmount(pool.lastMinedBlock.rewardWebd, { minimumFractionDigits: 0, maximumFractionDigits: 4 }) : 'N/A' }}
+            </p>
+          </div>
+        </div>
+      </section>
 
       <table class="data-table">
         <thead>
